@@ -60,6 +60,12 @@ SoundSpectrum.createCharts = function (app, view, audio) {
 
   function dimensions(canvas, context) {
     const {width, height} = canvas.getBoundingClientRect();
+    const compact = document.documentElement.classList.contains("compact-charts");
+    const left = compact ? (canvas === waterfall ? 44 : 31) : width < 500 ? 43 : 59;
+    const top = compact ? 8 : 15;
+    const plotWidth = width - left - (compact ? 4 : 18);
+    const plotHeight = height - top - (compact ? 17 : 28);
+    if (plotWidth <= 0 || plotHeight <= 0) return null;
     const ratio = Math.min(2, devicePixelRatio || 1);
     const w = Math.round(width * ratio), h = Math.round(height * ratio);
     if (!w || !h) return null;
@@ -68,8 +74,7 @@ SoundSpectrum.createCharts = function (app, view, audio) {
       canvas.height = h;
     }
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
-    const left = width < 500 ? 43 : 59;
-    return { width, height, left, top: 15, w: width - left - 18, h: height - 43 };
+    return {width, height, left, top, w: plotWidth, h: plotHeight, compact};
   }
 
   const plotX = (frequency, plot) => plot.left + (positionOf(frequency) - state.range[0]) / (state.range[1] - state.range[0]) * plot.w;
@@ -98,7 +103,7 @@ SoundSpectrum.createCharts = function (app, view, audio) {
   }
 
   function drawGrid(context, plot, isWater) {
-    context.font = '11px "IBM Plex Mono", Menlo, monospace';
+    context.font = `${plot.compact ? 10 : 11}px "IBM Plex Mono", Menlo, monospace`;
     context.textBaseline = "middle";
     context.lineWidth = 1;
     context.textAlign = "right";
@@ -116,7 +121,7 @@ SoundSpectrum.createCharts = function (app, view, audio) {
       context.lineTo(plot.left + plot.w, y);
       context.stroke();
       const value = isWater ? secondsPerTick * step : Math.round(-options.floor * step / 5);
-      context.fillText(isWater ? (value ? `−${value}s` : "现在") : (value ? `−${value}` : "0"), plot.left - 8, y);
+      context.fillText(isWater ? (value ? `−${value}s` : "现在") : (value ? `−${value}` : "0"), plot.left - (plot.compact ? 4 : 8), y);
     }
     if (!state.session) {
       context.beginPath();
@@ -138,7 +143,7 @@ SoundSpectrum.createCharts = function (app, view, audio) {
       context.stroke();
       const labelX = clamp(x, plot.left + 4, plot.width - 16);
       if (labelX - lastLabel < 34) continue;
-      context.fillText(f >= 1000 ? `${+(f / 1000).toFixed(2)}k` : `${+f.toFixed(1)}`, labelX, plot.top + plot.h + 15);
+      context.fillText(f >= 1000 ? `${+(f / 1000).toFixed(2)}k` : `${+f.toFixed(1)}`, labelX, plot.top + plot.h + (plot.compact ? 9 : 15));
       lastLabel = labelX;
     }
   }
@@ -383,9 +388,11 @@ SoundSpectrum.createCharts = function (app, view, audio) {
     if (cursorNode.hidden) return;
     const x = plot.left + clamp(position, 0, 1) * plot.w;
     const label = cursorNode.firstElementChild;
-    label.textContent = hz(frequency);
+    const measureLevel = plot.compact && canvas === spectrum;
+    label.textContent = measureLevel ? `${hz(frequency)} · ${dB(state.current[indexAt(frequency)])} dBFS` : hz(frequency);
     const margin = label.offsetWidth / 2 + 3;
     cursorNode.style.setProperty("--cursor-x", x + "px");
+    cursorNode.style.setProperty("--cursor-top", plot.top + "px");
     cursorNode.style.setProperty("--cursor-height", plot.h + "px");
     cursorNode.style.setProperty("--cursor-label-offset", (clamp(x, margin, plot.width - margin) - x) + "px");
   }

@@ -36,7 +36,7 @@ main { width: min(1440px, calc(100% - 48px)); margin-inline: auto; padding: 20px
 .status[data-state="mic"] { color: var(--active-ink); background: var(--active-bg); }
 .status[data-state="paused"] { color: var(--paused-ink); background: var(--paused-bg); }
 .notice { margin: 0 0 14px; padding: 10px 12px; background: var(--notice-bg); border-radius: 6px; font-size: 13px; color: var(--notice-ink); }
-main { display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 18px; align-items: start; grid-template-areas: "notice notice" "metadata charts" ". help"; }
+main { display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 18px; align-items: start; grid-template-areas: "notice notice" "metadata charts"; }
 main > .notice { grid-area: notice; margin-bottom: 12px; }
 .metadata { display: grid; gap: 3px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 12px; }
 main > .metadata { grid-area: metadata; }
@@ -60,7 +60,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 main[data-input="idle"] canvas { touch-action: auto; }
 #spectrum-wrap { height: var(--spectrum-height, clamp(225px, 32vh, 360px)); }
 #water-wrap { height: var(--water-height, 196px); }
-.chart-cursor { pointer-events: none; position: absolute; z-index: 1; top: 15px; left: var(--cursor-x); height: var(--cursor-height); border-left: 1px dashed var(--cursor); }
+.chart-cursor { pointer-events: none; position: absolute; z-index: 1; top: var(--cursor-top, 15px); left: var(--cursor-x); height: var(--cursor-height); border-left: 1px dashed var(--cursor); }
 .chart-cursor span { position: absolute; top: 100%; left: var(--cursor-label-offset); transform: translateX(-50%); margin-top: 5px; padding: 2px 4px; border: 1px solid var(--marker-border); border-radius: 3px; background: var(--marker-bg); color: var(--marker-ink); font: 11px var(--mono); white-space: nowrap; }
 .water-controls { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 :is(.water-controls, .chart-actions) select { min-height: 28px; max-width: 100%; padding: 0 3px; border: 1px solid var(--control-border); border-radius: 5px; background: var(--paper); color: var(--ink); font-size: 11px; }
@@ -100,6 +100,11 @@ main[data-input="idle"] canvas { touch-action: auto; }
 .chart-head-compact [popover] .button { justify-content: flex-start; }
 .chart-head-compact .scale { justify-content: space-between; gap: 4px; padding: 4px 0; }
 .chart-head-compact .ramp { flex: 1; }
+.chart-head-compact .plot-footer { display: grid; gap: 4px; padding: 6px 0 0; }
+.chart-head-compact .peak-list { flex-wrap: wrap; overflow: visible; padding: 0; }
+.chart-head-compact .peak-list li { white-space: normal; overflow-wrap: anywhere; }
+.chart-head-compact .water-history { display: grid; grid-template-columns: 1fr auto; gap: 3px 5px; padding: 6px 0 0; }
+.chart-head-compact .water-history input { grid-column: 1 / -1; grid-row: 2; width: 100%; margin: 0; }
 main[data-layout="side"] #water-section { align-self: start; height: var(--water-viewport-height, 70vh); display: flex; flex-direction: column; }
 main[data-layout="side"] #water-wrap { height: auto; flex: 1; }
 main[data-layout="side"] #waterfall { position: absolute; inset: 0; }
@@ -123,8 +128,6 @@ main[data-layout="side"] #water-resize { display: none; }
 .peak-list { display: flex; flex-wrap: wrap; gap: 5px; margin: 0; padding: 0 13px 9px; list-style: none; }
 .peak-list li { border: 1px solid var(--marker-border); border-radius: 4px; background: var(--marker-bg); color: var(--marker-ink); padding: 4px 6px; font: 11px var(--mono); white-space: nowrap; }
 .peak-list .primary-peak { font-weight: 750; border-color: var(--trace); }
-.help { margin: 12px 1px 0; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 7px; color: var(--muted); font-size: 11px; }
-main > .help { grid-area: help; }
 dialog { width: min(770px, calc(100% - 26px)); max-height: calc(100% - 30px); border: 1px solid var(--line); border-radius: 10px; padding: 0; color: var(--ink); background: var(--paper); box-shadow: 0 14px 46px var(--shadow); }
 dialog[open] { display: flex; flex-direction: column; }
 .dialog-head, .settings-footer { flex-shrink: 0; }
@@ -167,7 +170,7 @@ dialog::backdrop { background: var(--backdrop); }
   #water-wrap { height: var(--water-height, 168px); }
 }
 @media (max-width: 1000px) {
-  main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "notice" "charts" "metadata" "help"; }
+  main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "notice" "charts" "metadata"; }
   .metadata { margin-top: 12px; }
   .metadata dl { display: flex; flex-wrap: wrap; gap: 5px 15px; }
 }
@@ -181,37 +184,58 @@ dialog::backdrop { background: var(--backdrop); }
   .ramp { width: 60px; }
 }
 
-@media (orientation: portrait) {
-  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
-  body { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100dvh; }
-  .top { padding-inline: 12px; flex-wrap: wrap; }
-  .top .layout-controls { display: none; }
-  .settings-launcher { position: static; width: 32px; min-height: 32px; padding: 0; box-shadow: none; }
-  .settings-launcher span { display: none; }
-  main {
-    width: calc(100% - 24px);
-    min-height: 0;
-    padding: 6px 0 max(6px, env(safe-area-inset-bottom));
-    grid-template: "notice" auto "charts" minmax(0, 1fr) / minmax(0, 1fr);
-    align-items: stretch;
-    overflow: clip;
-  }
-  main > .notice { margin-bottom: 6px; }
-  main > :is(.metadata, .help) { display: none; }
-  .instrument {
-    min-height: 0;
-    grid-template-rows: minmax(0, var(--portrait-spectrum-share, 1fr)) 24px minmax(0, var(--portrait-water-share, 1fr));
-    gap: 0;
-    align-items: stretch;
-  }
-  .instrument:has(#water-section[hidden]) { grid-template-rows: minmax(0, 1fr); }
-  .instrument .chart-card { display: flex; flex-direction: column; min-height: 0; overflow: clip; }
-  .instrument .chart-card > :not(.canvas-wrap) { flex-shrink: 0; }
-  .instrument :is(#spectrum-wrap, #water-wrap) { flex: 1; min-height: 0; height: auto; }
-  .instrument canvas { position: absolute; inset: 0; }
-  .instrument .chart-card .chart-resize { display: none; }
-  #chart-splitter { height: 100%; border: 0; border-radius: 6px; }
-  #chart-splitter::after { width: 36px; }
-  .peak-list { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-  .settings :is(.metadata, .help) { grid-column: 1 / -1; margin: 0; }
+.viewport-charts, .viewport-charts body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+.viewport-charts body { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100dvh; }
+.viewport-charts .top { padding-inline: 12px; flex-wrap: wrap; }
+.viewport-charts .top .layout-controls { display: none; }
+.viewport-charts .settings-launcher { position: static; width: 32px; min-height: 32px; padding: 0; box-shadow: none; }
+.viewport-charts .settings-launcher span { display: none; }
+.viewport-charts main {
+  width: calc(100% - 24px);
+  min-height: 0;
+  padding: 6px 0 max(6px, env(safe-area-inset-bottom));
+  grid-template: "notice" auto "charts" minmax(0, 1fr) / minmax(0, 1fr);
+  align-items: stretch;
+  overflow: clip;
 }
+.viewport-charts main > .notice { margin-bottom: 6px; }
+.viewport-charts main > .metadata { display: none; }
+.viewport-charts .instrument {
+  min-height: 0;
+  grid-template-rows: minmax(0, var(--portrait-spectrum-share, 1fr)) var(--chart-splitter-height, 24px) minmax(0, var(--portrait-water-share, 1fr));
+  gap: 0;
+  align-items: stretch;
+}
+.viewport-charts .instrument:has(#water-section[hidden]) { grid-template-rows: minmax(0, 1fr); }
+.viewport-charts .instrument .chart-card { display: flex; flex-direction: column; min-height: 0; overflow: clip; }
+.viewport-charts .instrument .chart-card > :not(.canvas-wrap) { flex-shrink: 0; }
+.viewport-charts .instrument :is(#spectrum-wrap, #water-wrap) { flex: 1; min-height: 0; height: auto; }
+.viewport-charts .instrument canvas { position: absolute; inset: 0; }
+.viewport-charts .instrument .chart-card .chart-resize { display: none; }
+#chart-splitter { position: relative; height: 100%; border: 0; border-radius: 6px; }
+#chart-splitter::after { width: 36px; }
+.viewport-charts .chart-card > .peak-list { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.viewport-charts .settings .metadata { grid-column: 1 / -1; margin: 0; }
+
+.compact-charts { --chart-splitter-height: 14px; }
+.compact-charts main { width: 100%; padding: 0 0 env(safe-area-inset-bottom); }
+.compact-charts .chart-card { border: 0; border-radius: 0; }
+.compact-charts .instrument { gap: 0; }
+.compact-charts .top { min-height: 36px; padding: 2px 6px; }
+.compact-charts .crumb { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.compact-charts .top-actions { width: auto; flex-wrap: wrap; gap: 3px; margin-left: 0; }
+.compact-charts .top :is(.icon-button, .settings-launcher) { width: 28px; min-height: 28px; }
+.compact-charts #mic-button { min-height: 28px; padding: 0 6px; font-size: 12px; }
+.compact-charts .chart-cursor span { margin-top: 2px; padding-block: 1px; font-size: 10px; }
+.compact-charts #chart-splitter::before { content: ""; position: absolute; inset: -5px 0; z-index: 2; }
+
+.charts-fullscreen .top { min-height: 0; height: 0; padding: 0; border: 0; }
+.charts-fullscreen .top-actions > :not(#fullscreen-button) { display: none; }
+.charts-fullscreen #fullscreen-button {
+  position: fixed;
+  z-index: 3;
+  top: env(safe-area-inset-top);
+  right: max(36px, env(safe-area-inset-right));
+  background: var(--paper);
+}
+.charts-fullscreen #fullscreen-button:focus-visible { outline-offset: -2px; }

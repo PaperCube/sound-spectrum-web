@@ -7,25 +7,32 @@ SoundSpectrum.bindControls = function (app, view, audio, charts) {
   const { setupAnalysis, collect, showNotice, stopMicrophone, refreshDevices, useMicrophone, togglePause,
     calibrateNoise, setNoiseFilter } = audio;
   const { waterFloor, updateWaterRamp, applyThemeColors } = charts;
+  const root = document.documentElement;
   const overview = $("overview");
-  const topActions = document.querySelector(".top-actions");
   const settingsLauncher = $("settings-button");
+  const fullscreenButton = $("fullscreen-button");
   const settingsDialog = $("settings-dialog");
   const settings = settingsDialog.querySelector(".settings");
   const metadata = overview.querySelector(".metadata");
-  const help = overview.querySelector(".help");
   const instrument = overview.querySelector(".instrument");
   const splitter = $("chart-splitter");
   const spectrumCard = $("spectrum-section");
   const waterCard = $("water-section");
   const spectrumWrap = $("spectrum-wrap");
   const waterWrap = $("water-wrap");
+  const compactHeaders = matchMedia("(max-width: 700px), (max-height: 500px) and (pointer: coarse)");
+  const supportsPopovers = "showPopover" in HTMLElement.prototype;
+  let fullscreenFallback = false;
+  const fullscreenActive = () => Boolean(document.fullscreenElement) || fullscreenFallback;
 
-  if ("showPopover" in HTMLElement.prototype) {
-    const compactHeaders = matchMedia("(max-width: 700px), (max-height: 500px) and (pointer: coarse)");
+  const syncChartMenus = [];
+  if (supportsPopovers) {
     for (const trigger of instrument.querySelectorAll(".chart-menu-toggle")) {
       const head = trigger.closest(".panel-head");
       const menu = trigger.popoverTargetElement;
+      const card = head.closest(".chart-card");
+      const readouts = Array.from(card.querySelectorAll(":scope > .plot-footer, :scope > .peak-list, :scope > .water-history"));
+      const resizeHandle = card.querySelector(".chart-resize");
       const positionMenu = () => {
         const {top, right, bottom} = trigger.getBoundingClientRect();
         const below = window.innerHeight - bottom - 12;
@@ -36,21 +43,46 @@ SoundSpectrum.bindControls = function (app, view, audio, charts) {
         menu.style.setProperty("--chart-menu-bottom", openAbove ? (window.innerHeight - top + 4) + "px" : "auto");
         menu.style.setProperty("--chart-menu-max-height", Math.max(0, openAbove ? above : below) + "px");
       };
-      const sync = () => {
-        head.classList.toggle("chart-head-compact", compactHeaders.matches);
-        if (compactHeaders.matches) menu.setAttribute("popover", "auto");
-        else menu.removeAttribute("popover");
-      };
+      syncChartMenus.push(compact => {
+        if (compact === head.classList.contains("chart-head-compact")) return;
+        head.classList.toggle("chart-head-compact", compact);
+        if (compact) {
+          menu.setAttribute("popover", "auto");
+          menu.append(...readouts);
+        } else {
+          menu.removeAttribute("popover");
+          resizeHandle.before(...readouts);
+        }
+      });
       menu.addEventListener("beforetoggle", event => {
         if (event.newState === "open") positionMenu();
       });
       window.addEventListener("resize", () => {
         if (menu.matches(":popover-open")) positionMenu();
       });
-      compactHeaders.addEventListener("change", sync);
-      sync();
     }
   }
+
+  fullscreenButton.addEventListener("click", async () => {
+    if (fullscreenFallback) {
+      fullscreenFallback = false;
+      updateLayout();
+    } else if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    } else {
+      if (document.fullscreenEnabled && root.requestFullscreen) {
+        try {
+          await root.requestFullscreen();
+          return;
+        } catch {
+          // Some mobile browsers only support fullscreen video.
+        }
+      }
+      fullscreenFallback = true;
+      updateLayout();
+    }
+  });
+  document.addEventListener("fullscreenchange", updateLayout);
 
   function syncSettings() {
     for (const [key, value] of Object.entries(options)) {
@@ -73,21 +105,30 @@ SoundSpectrum.bindControls = function (app, view, audio, charts) {
   }
 
   function updateLayout() {
-    const portrait = portraitLayout.matches;
-    const fixedStack = portrait || compactLayout.matches || !options["show-water"];
+    const fullscreen = fullscreenActive();
+    const viewportCharts = portraitLayout.matches || fullscreen;
+    const compact = compactHeaders.matches || fullscreen;
+    root.classList.toggle("compact-charts", compact);
+    root.classList.toggle("viewport-charts", viewportCharts);
+    root.classList.toggle("charts-fullscreen", fullscreen);
+    for (const sync of syncChartMenus) sync(compact);
+    const fullscreenLabel = fullscreen ? "退出全屏" : "全屏";
+    fullscreenButton.setAttribute("aria-label", fullscreenLabel);
+    fullscreenButton.setAttribute("aria-pressed", fullscreen);
+    fullscreenButton.title = fullscreenLabel;
+    $("fullscreen-icon").setAttribute("href", fullscreen ? "#i-exit-fullscreen" : "#i-fullscreen");
+    const fixedStack = viewportCharts || compactLayout.matches || !options["show-water"];
     const layout = fixedStack ? "stack" : options.layout;
     overview.dataset.layout = layout;
-    $("spectrum-height").disabled = portrait;
-    $("water-height").disabled = portrait || layout === "side";
-    splitter.hidden = !portrait || !options["show-water"];
-    if (portrait && metadata.parentElement !== settings) {
-      topActions.append(settingsLauncher);
+    $("spectrum-height").disabled = viewportCharts;
+    $("water-height").disabled = viewportCharts || layout === "side";
+    splitter.hidden = !viewportCharts || !options["show-water"];
+    if (viewportCharts && metadata.parentElement !== settings) {
+      fullscreenButton.before(settingsLauncher);
       settings.prepend(metadata);
-      settings.append(help);
-    } else if (!portrait && metadata.parentElement !== overview) {
+    } else if (!viewportCharts && metadata.parentElement !== overview) {
       overview.after(settingsLauncher);
       instrument.before(metadata);
-      instrument.after(help);
     }
     updatePortraitSplit();
     updateWaterViewportHeight();
@@ -114,6 +155,7 @@ SoundSpectrum.bindControls = function (app, view, audio, charts) {
   }
   compactLayout.addEventListener("change", updateLayout);
   portraitLayout.addEventListener("change", updateLayout);
+  compactHeaders.addEventListener("change", updateLayout);
 
   function panelControlsHeight(card, wrap) {
     let height = card.offsetHeight - card.clientHeight;
@@ -177,7 +219,6 @@ SoundSpectrum.bindControls = function (app, view, audio, charts) {
 
   function applyTheme() {
     const resolved = options.theme === "system" ? (darkPreference.matches ? "dark" : "light") : options.theme;
-    const root = document.documentElement;
     root.dataset.theme = resolved;
     applyThemeColors(getComputedStyle(root));
     for (const button of themeButtons) button.setAttribute("aria-pressed", button.dataset.themeChoice === options.theme);
@@ -363,6 +404,12 @@ SoundSpectrum.bindControls = function (app, view, audio, charts) {
   });
 
   document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && !event.defaultPrevented && fullscreenFallback && !settingsDialog.open
+      && (!supportsPopovers || !instrument.querySelector(":popover-open"))) {
+      fullscreenFallback = false;
+      updateLayout();
+      return;
+    }
     if (!state.session || settingsDialog.open || event.code !== "Space" || event.repeat || event.target.closest("button, input, select")) return;
     event.preventDefault();
     togglePause();
