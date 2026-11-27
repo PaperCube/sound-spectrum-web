@@ -103,6 +103,7 @@ SoundSpectrum.createCharts = function (app, view, audio) {
   }
 
   function drawGrid(context, plot, isWater) {
+    const showLines = !isWater || options["water-grid"];
     context.font = `${plot.compact ? 10 : 11}px "IBM Plex Mono", Menlo, monospace`;
     context.textBaseline = "middle";
     context.lineWidth = 1;
@@ -116,14 +117,17 @@ SoundSpectrum.createCharts = function (app, view, audio) {
     const tickCount = isWater ? Math.floor((plot.h / pixelsPerSecond + state.waterHistoryOffset) / secondsPerTick) : 5;
     for (let step = firstTick; step <= tickCount; step++) {
       const y = Math.round(plot.top + step * tickSpacing - (isWater ? state.waterHistoryOffset * pixelsPerSecond : 0)) + .5;
-      context.beginPath();
-      context.moveTo(plot.left, y);
-      context.lineTo(plot.left + plot.w, y);
-      context.stroke();
+      if (showLines) {
+        context.beginPath();
+        context.moveTo(plot.left, y);
+        context.lineTo(plot.left + plot.w, y);
+        context.stroke();
+      }
       const value = isWater ? secondsPerTick * step : Math.round(-options.floor * step / 5);
       context.fillText(isWater ? (value ? `−${value}s` : "现在") : (value ? `−${value}` : "0"), plot.left - (plot.compact ? 4 : 8), y);
     }
     if (!state.session) {
+      if (!showLines) return;
       context.beginPath();
       for (let step = 0; step <= 8; step++) {
         const x = Math.round(plot.left + plot.w * step / 8) + .5;
@@ -137,10 +141,12 @@ SoundSpectrum.createCharts = function (app, view, audio) {
     let lastLabel = -Infinity;
     for (const f of frequencyTicks(plot)) {
       const x = Math.round(plotX(f, plot)) + .5;
-      context.beginPath();
-      context.moveTo(x, plot.top);
-      context.lineTo(x, plot.top + plot.h);
-      context.stroke();
+      if (showLines) {
+        context.beginPath();
+        context.moveTo(x, plot.top);
+        context.lineTo(x, plot.top + plot.h);
+        context.stroke();
+      }
       const labelX = clamp(x, plot.left + 4, plot.width - 16);
       if (labelX - lastLabel < 34) continue;
       context.fillText(f >= 1000 ? `${+(f / 1000).toFixed(2)}k` : `${+f.toFixed(1)}`, labelX, plot.top + plot.h + (plot.compact ? 9 : 15));

@@ -14,7 +14,7 @@ const SoundSpectrum = (() => {
     fft: 2048, multires: true, "multires-bands": 3, smoothing: 0.55, interval: 64, floor: -100,
     history: 20, "show-water": true, "remove-dc": true, log: true, hold: true,
     "peak-count": 3, "peak-floor": -100, "peak-spacing": 24, "frequency-range": "full",
-    "spectrum-fill": true, "spectrum-smoothing": 24, "water-palette": "blue", "water-floor": 0,
+    "spectrum-fill": true, "spectrum-smoothing": 24, "water-palette": "blue", "water-floor": 0, "water-grid": true,
     "spectrum-height": 0, "water-height": 0, "water-quality": "standard", "water-time-scale": 10,
     layout: "stack", "portrait-split": 0.5, theme: "system"
   };

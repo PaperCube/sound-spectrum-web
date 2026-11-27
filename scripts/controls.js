@@ -356,6 +356,7 @@ SoundSpectrum.bindControls = function (app, view, audio, charts) {
       if (key === "show-water") updateLayout();
       persistSettings();
       if (key === "spectrum-smoothing") state.dirty = true;
+      else if (key === "water-grid") state.waterDirty = true;
       else invalidate();
     });
   }

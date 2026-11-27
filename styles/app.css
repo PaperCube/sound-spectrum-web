@@ -63,6 +63,8 @@ main[data-input="idle"] canvas { touch-action: auto; }
 .chart-cursor { pointer-events: none; position: absolute; z-index: 1; top: var(--cursor-top, 15px); left: var(--cursor-x); height: var(--cursor-height); border-left: 1px dashed var(--cursor); }
 .chart-cursor span { position: absolute; top: 100%; left: var(--cursor-label-offset); transform: translateX(-50%); margin-top: 5px; padding: 2px 4px; border: 1px solid var(--marker-border); border-radius: 3px; background: var(--marker-bg); color: var(--marker-ink); font: 11px var(--mono); white-space: nowrap; }
 .water-controls { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.water-grid-toggle { display: flex; align-items: center; gap: 5px; min-height: 28px; font-size: 11px; white-space: nowrap; }
+.water-grid-toggle input { margin: 0; accent-color: var(--accent); }
 :is(.water-controls, .chart-actions) select { min-height: 28px; max-width: 100%; padding: 0 3px; border: 1px solid var(--control-border); border-radius: 5px; background: var(--paper); color: var(--ink); font-size: 11px; }
 .panel-head .chart-menu-toggle { display: none; }
 .panel-head.chart-head-compact { position: absolute; inset: 0 0 auto auto; z-index: 2; min-height: 0; padding: 0; }
@@ -97,6 +99,7 @@ main[data-input="idle"] canvas { touch-action: auto; }
 .chart-head-compact [popover]:not(:popover-open) { display: none; }
 .chart-head-compact [popover]:popover-open { display: grid; justify-content: stretch; gap: 6px; }
 .chart-head-compact [popover] :is(.button, select) { min-height: 34px; padding: 0 8px; font-size: 13px; }
+.chart-head-compact .water-grid-toggle { min-height: 34px; padding: 0 8px; font-size: 13px; }
 .chart-head-compact [popover] .button { justify-content: flex-start; }
 .chart-head-compact .scale { justify-content: space-between; gap: 4px; padding: 4px 0; }
 .chart-head-compact .ramp { flex: 1; }
