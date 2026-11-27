@@ -21,6 +21,37 @@ SoundSpectrum.bindControls = function (app, view, audio, charts) {
   const spectrumWrap = $("spectrum-wrap");
   const waterWrap = $("water-wrap");
 
+  if ("showPopover" in HTMLElement.prototype) {
+    const compactHeaders = matchMedia("(max-width: 700px), (max-height: 500px) and (pointer: coarse)");
+    for (const trigger of instrument.querySelectorAll(".chart-menu-toggle")) {
+      const head = trigger.closest(".panel-head");
+      const menu = trigger.popoverTargetElement;
+      const positionMenu = () => {
+        const {top, right, bottom} = trigger.getBoundingClientRect();
+        const below = window.innerHeight - bottom - 12;
+        const above = top - 12;
+        const openAbove = below < 200 && above > below;
+        menu.style.setProperty("--chart-menu-right", Math.max(8, window.innerWidth - right) + "px");
+        menu.style.setProperty("--chart-menu-top", openAbove ? "auto" : (bottom + 4) + "px");
+        menu.style.setProperty("--chart-menu-bottom", openAbove ? (window.innerHeight - top + 4) + "px" : "auto");
+        menu.style.setProperty("--chart-menu-max-height", Math.max(0, openAbove ? above : below) + "px");
+      };
+      const sync = () => {
+        head.classList.toggle("chart-head-compact", compactHeaders.matches);
+        if (compactHeaders.matches) menu.setAttribute("popover", "auto");
+        else menu.removeAttribute("popover");
+      };
+      menu.addEventListener("beforetoggle", event => {
+        if (event.newState === "open") positionMenu();
+      });
+      window.addEventListener("resize", () => {
+        if (menu.matches(":popover-open")) positionMenu();
+      });
+      compactHeaders.addEventListener("change", sync);
+      sync();
+    }
+  }
+
   function syncSettings() {
     for (const [key, value] of Object.entries(options)) {
       const input = $(key);
@@ -87,7 +118,7 @@ SoundSpectrum.bindControls = function (app, view, audio, charts) {
   function panelControlsHeight(card, wrap) {
     let height = card.offsetHeight - card.clientHeight;
     for (const child of card.children) {
-      if (child !== wrap) height += child.offsetHeight;
+      if (child !== wrap && !child.classList.contains("chart-head-compact")) height += child.offsetHeight;
     }
     return height;
   }

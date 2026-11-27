@@ -47,7 +47,7 @@ main > .metadata { grid-area: metadata; }
 .metadata dd { margin: 0; font: 11px/1.5 var(--mono); }
 .instrument { grid-area: charts; display: grid; gap: 16px; align-items: start; }
 @media (min-width: 821px) { main[data-layout="side"] .instrument { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.chart-card { border: 1px solid var(--line); border-radius: 8px; min-width: 0; scroll-margin-top: 12px; }
+.chart-card { position: relative; border: 1px solid var(--line); border-radius: 8px; min-width: 0; scroll-margin-top: 12px; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 13px; min-height: 48px; }
 .panel-head h2 { margin: 0; font-size: 14px; white-space: nowrap; }
 .plot-title, .chart-actions { display: flex; align-items: center; gap: 7px; }
@@ -64,6 +64,42 @@ main[data-input="idle"] canvas { touch-action: auto; }
 .chart-cursor span { position: absolute; top: 100%; left: var(--cursor-label-offset); transform: translateX(-50%); margin-top: 5px; padding: 2px 4px; border: 1px solid var(--marker-border); border-radius: 3px; background: var(--marker-bg); color: var(--marker-ink); font: 11px var(--mono); white-space: nowrap; }
 .water-controls { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 :is(.water-controls, .chart-actions) select { min-height: 28px; max-width: 100%; padding: 0 3px; border: 1px solid var(--control-border); border-radius: 5px; background: var(--paper); color: var(--ink); font-size: 11px; }
+.panel-head .chart-menu-toggle { display: none; }
+.panel-head.chart-head-compact { position: absolute; inset: 0 0 auto auto; z-index: 2; min-height: 0; padding: 0; }
+.chart-head-compact .plot-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.panel-head.chart-head-compact .chart-menu-toggle {
+  display: inline-flex;
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-color: transparent;
+  border-radius: 0 7px 0 6px;
+  background: transparent;
+  color: var(--muted);
+  font: 20px/1 var(--mono);
+}
+.chart-head-compact .chart-menu-toggle:is(:hover, :focus-visible) { background: var(--surface-hover); color: var(--ink); }
+.chart-head-compact [popover] {
+  position: fixed;
+  inset: var(--chart-menu-top, auto) var(--chart-menu-right, 8px) var(--chart-menu-bottom, auto) auto;
+  width: min(195px, calc(100vw - 16px));
+  max-height: var(--chart-menu-max-height, none);
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 4px 16px var(--shadow);
+}
+.chart-head-compact [popover]:not(:popover-open) { display: none; }
+.chart-head-compact [popover]:popover-open { display: grid; justify-content: stretch; gap: 6px; }
+.chart-head-compact [popover] :is(.button, select) { min-height: 34px; padding: 0 8px; font-size: 13px; }
+.chart-head-compact [popover] .button { justify-content: flex-start; }
+.chart-head-compact .scale { justify-content: space-between; gap: 4px; padding: 4px 0; }
+.chart-head-compact .ramp { flex: 1; }
 main[data-layout="side"] #water-section { align-self: start; height: var(--water-viewport-height, 70vh); display: flex; flex-direction: column; }
 main[data-layout="side"] #water-wrap { height: auto; flex: 1; }
 main[data-layout="side"] #waterfall { position: absolute; inset: 0; }
