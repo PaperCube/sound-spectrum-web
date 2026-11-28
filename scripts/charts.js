@@ -11,6 +11,8 @@ SoundSpectrum.createCharts = function (app, view, audio) {
   const waterContext = waterfall.getContext("2d");
   const waterImage = document.createElement("canvas");
   const imageContext = waterImage.getContext("2d");
+  const yAxisWidth = 27;
+  const yAxisFont = '10px "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif';
 
   const paletteStops = {
     blue: [[241, 242, 239], [203, 221, 235], [131, 176, 202], [71, 109, 156], [32, 45, 74]],
@@ -61,7 +63,7 @@ SoundSpectrum.createCharts = function (app, view, audio) {
   function dimensions(canvas, context) {
     const {width, height} = canvas.getBoundingClientRect();
     const compact = document.documentElement.classList.contains("compact-charts");
-    const left = compact ? 27 : width < 500 ? 43 : 59;
+    const left = yAxisWidth;
     const top = compact ? 6 : 15;
     const plotWidth = width - left - (compact ? 4 : 18);
     const plotHeight = height - top - (compact ? 13 : 28);
@@ -104,8 +106,7 @@ SoundSpectrum.createCharts = function (app, view, audio) {
 
   function drawGrid(context, plot, isWater) {
     const showLines = !isWater || options["water-grid"];
-    const axisFont = `${plot.compact ? 10 : 11}px "IBM Plex Mono", Menlo, monospace`;
-    context.font = plot.compact ? '10px "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif' : axisFont;
+    context.font = yAxisFont;
     context.textBaseline = "middle";
     context.lineWidth = 1;
     context.textAlign = "right";
@@ -116,6 +117,7 @@ SoundSpectrum.createCharts = function (app, view, audio) {
     const tickSpacing = isWater ? secondsPerTick * pixelsPerSecond : plot.h / 5;
     const firstTick = isWater ? Math.ceil(state.waterHistoryOffset / secondsPerTick) : 0;
     const tickCount = isWater ? Math.floor((plot.h / pixelsPerSecond + state.waterHistoryOffset) / secondsPerTick) : 5;
+    const labelRight = plot.left - 3;
     for (let step = firstTick; step <= tickCount; step++) {
       const y = Math.round(plot.top + step * tickSpacing - (isWater ? state.waterHistoryOffset * pixelsPerSecond : 0)) + .5;
       if (showLines) {
@@ -126,7 +128,6 @@ SoundSpectrum.createCharts = function (app, view, audio) {
       }
       const value = isWater ? secondsPerTick * step : Math.round(-options.floor * step / 5);
       const label = isWater ? (value ? `−${value}s` : "现在") : (value ? `−${value}` : "0");
-      const labelRight = plot.left - (plot.compact ? 3 : 8);
       context.fillText(label, labelRight, y, labelRight);
     }
     if (!state.session) {
@@ -140,7 +141,7 @@ SoundSpectrum.createCharts = function (app, view, audio) {
       context.stroke();
       return;
     }
-    context.font = axisFont;
+    context.font = `${plot.compact ? 10 : 11}px "IBM Plex Mono", Menlo, monospace`;
     context.textAlign = "center";
     let lastLabel = -Infinity;
     for (const f of frequencyTicks(plot)) {
