@@ -86,6 +86,70 @@ SoundSpectrum.bindControls = function (app, view, audio, charts) {
   });
   document.addEventListener("fullscreenchange", updateLayout);
 
+  const wakeLockButtons = instrument.querySelectorAll(".wake-lock-button");
+  const wakeLockUnavailable = "当前页面无法阻止屏幕休眠，请使用支持此功能的浏览器并通过 HTTPS 打开。";
+  const wakeLockFailed = "浏览器未能阻止屏幕休眠。";
+  let keepScreenAwake = false;
+  let screenLock = null;
+  let requestingScreenLock = false;
+
+  function updateWakeLockButtons() {
+    for (const button of wakeLockButtons) {
+      button.setAttribute("aria-pressed", Boolean(screenLock && !screenLock.released));
+      button.disabled = requestingScreenLock;
+    }
+  }
+
+  async function syncScreenWakeLock() {
+    if (!keepScreenAwake || document.visibilityState !== "visible") {
+      const lock = screenLock;
+      screenLock = null;
+      updateWakeLockButtons();
+      if (lock && !lock.released) await lock.release();
+      return;
+    }
+    if (requestingScreenLock || (screenLock && !screenLock.released)) return;
+    requestingScreenLock = true;
+    let interrupted = false;
+    updateWakeLockButtons();
+    try {
+      const lock = await navigator.wakeLock.request("screen");
+      if (!keepScreenAwake || document.visibilityState !== "visible") {
+        interrupted = true;
+        await lock.release();
+        return;
+      }
+      screenLock = lock;
+      if ($("notice").textContent === wakeLockFailed || $("notice").textContent === wakeLockUnavailable) showNotice();
+      lock.addEventListener("release", () => {
+        if (screenLock !== lock) return;
+        screenLock = null;
+        updateWakeLockButtons();
+      });
+    } catch {
+      if (document.visibilityState === "visible") {
+        keepScreenAwake = false;
+        showNotice(wakeLockFailed);
+      }
+    } finally {
+      requestingScreenLock = false;
+      updateWakeLockButtons();
+      if (interrupted && keepScreenAwake && document.visibilityState === "visible") syncScreenWakeLock();
+    }
+  }
+
+  for (const button of wakeLockButtons) {
+    button.addEventListener("click", () => {
+      if (!navigator.wakeLock) {
+        showNotice(wakeLockUnavailable);
+        return;
+      }
+      keepScreenAwake = !screenLock || screenLock.released;
+      syncScreenWakeLock();
+    });
+  }
+  document.addEventListener("visibilitychange", syncScreenWakeLock);
+
   function syncSettings() {
     const scaleFloor = $("water-floor");
     const scaleCeiling = $("water-ceiling");

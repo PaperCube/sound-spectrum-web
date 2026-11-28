@@ -82,8 +82,8 @@ main[data-input="idle"] canvas { touch-action: auto; }
 .water-controls { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .water-grid-toggle { display: flex; align-items: center; gap: 5px; min-height: 28px; font-size: 11px; white-space: nowrap; }
 .water-grid-toggle input { margin: 0; accent-color: var(--accent); }
-.water-controls .water-lock-button { min-height: 28px; font-size: 11px; }
-.water-lock-button[aria-pressed="true"] { background: var(--surface-selected); }
+.water-controls :is(.water-lock-button, .wake-lock-button) { min-height: 28px; font-size: 11px; }
+:is(.water-lock-button, .wake-lock-button)[aria-pressed="true"] { background: var(--surface-selected); }
 :is(.water-controls, .chart-actions) select { min-height: 28px; max-width: 100%; padding: 0 3px; border: 1px solid var(--control-border); border-radius: 5px; background: var(--paper); color: var(--ink); font-size: 11px; }
 .panel-head .chart-menu-toggle { display: none; }
 .panel-head.chart-head-compact { position: absolute; inset: var(--chart-action-top) var(--chart-action-right) auto auto; z-index: 2; min-height: 0; padding: 0; }
