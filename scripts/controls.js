@@ -6,7 +6,7 @@ SoundSpectrum.bindControls = function (app, view, audio, charts) {
   const { resetView } = view;
   const { setupAnalysis, collect, showNotice, stopMicrophone, refreshDevices, useMicrophone, togglePause,
     calibrateNoise, setNoiseFilter } = audio;
-  const { waterFloor, updateWaterRamp, applyThemeColors } = charts;
+  const { waterFloor, waterScale, updateWaterRamp, applyThemeColors } = charts;
   const root = document.documentElement;
   const overview = $("overview");
   const settingsLauncher = $("settings-button");
@@ -87,6 +87,13 @@ SoundSpectrum.bindControls = function (app, view, audio, charts) {
   document.addEventListener("fullscreenchange", updateLayout);
 
   function syncSettings() {
+    const scaleFloor = $("water-floor");
+    const scaleCeiling = $("water-ceiling");
+    const automaticContrast = options["water-contrast"] === "auto";
+    const minimumCeiling = waterFloor() + 1;
+    options["water-ceiling"] = Math.max(minimumCeiling, options["water-ceiling"]);
+    scaleFloor.disabled = scaleCeiling.disabled = automaticContrast;
+    scaleCeiling.min = minimumCeiling;
     for (const [key, value] of Object.entries(options)) {
       const input = $(key);
       if (!input) continue;
@@ -100,7 +107,6 @@ SoundSpectrum.bindControls = function (app, view, audio, charts) {
     $("hold-button").setAttribute("aria-pressed", options.hold);
     $("hold-legend").hidden = !options.hold;
     $("water-section").hidden = !options["show-water"];
-    $("scale-low").textContent = String(waterFloor()).replace("-", "−");
     $("meta-fft").textContent = options.fft;
     $("meta-interval").textContent = options.interval + " ms";
     updateWaterRamp();
@@ -343,10 +349,15 @@ SoundSpectrum.bindControls = function (app, view, audio, charts) {
         input.value = options.history;
         return;
       }
+      if (key === "water-ceiling" && !Number.isInteger(input.valueAsNumber)) {
+        input.value = options[key];
+        return;
+      }
       options[key] = typeof options[key] === "number" ? Number(input.value)
         : typeof options[key] === "string" ? input.value
         : input.type === "checkbox" ? input.checked : input.value === "true";
       if (key === "interval") state.nextFrame = -Infinity;
+      if (key === "water-ceiling") options[key] = clamp(options[key], waterFloor() + 1, 0);
       if (key === "frequency-range" || key === "log") resetView();
       if (key === "hold" && options.hold) state.held = state.current.slice();
       if (state.session && ["fft", "multires", "multires-bands", "remove-dc"].includes(key)) {
@@ -358,7 +369,7 @@ SoundSpectrum.bindControls = function (app, view, audio, charts) {
       if (key === "show-water") updateLayout();
       persistSettings();
       if (key === "spectrum-smoothing") state.dirty = true;
-      else if (key === "water-grid") state.waterDirty = true;
+      else if (["water-grid", "water-palette", "water-floor", "water-ceiling", "water-contrast"].includes(key)) state.waterDirty = true;
       else invalidate();
     });
   }
@@ -385,6 +396,12 @@ SoundSpectrum.bindControls = function (app, view, audio, charts) {
   $("clear-button").addEventListener("click", () => { state.history = []; state.waterHistoryOffset = 0; state.waterDirty = true; });
   $("water-history-position").addEventListener("input", event => {
     state.waterHistoryOffset = Number(event.currentTarget.value);
+    state.waterDirty = true;
+  });
+  $("water-lock-scale").addEventListener("click", () => {
+    options["water-locked-range"] = options["water-locked-range"] ? null : waterScale();
+    updateWaterRamp();
+    persistSettings();
     state.waterDirty = true;
   });
   $("clear-peak-button").addEventListener("click", () => { state.held = state.current.slice(); state.dirty = true; });

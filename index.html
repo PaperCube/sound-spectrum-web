@@ -128,6 +128,11 @@
             <option value="ultra">极高分辨率</option>
           </select>
           <label class="water-grid-toggle"><input id="water-grid" type="checkbox" checked>显示网格</label>
+          <select id="water-contrast" aria-label="瀑布图色标方式">
+            <option value="manual">手动色标</option>
+            <option value="auto">自动对比度</option>
+          </select>
+          <button class="button water-lock-button" id="water-lock-scale" type="button" aria-pressed="false" hidden>锁定色标</button>
           <div class="scale"><span id="scale-low">−100</span><span class="ramp"></span><span id="scale-high">0 dBFS</span></div>
         </div>
       </div>
@@ -196,8 +201,9 @@
         <option value="10"><option value="20"><option value="30"><option value="60">
         <option value="90"><option value="120"><option value="180"><option value="240"><option value="300">
       </datalist>
-      <label>配色 <select id="water-palette"><option value="blue">蓝色</option><option value="heat">热力</option><option value="gray">灰阶</option></select></label>
+      <label>配色 <select id="water-palette"><option value="inferno" selected>Inferno</option><option value="cividis">Cividis</option><option value="blue">蓝色</option><option value="heat">热力</option><option value="gray">灰阶</option></select></label>
       <label>颜色电平下限 <select id="water-floor"><option value="0">跟随频谱</option><option value="-140">−140 dBFS</option><option value="-120">−120 dBFS</option><option value="-100">−100 dBFS</option><option value="-80">−80 dBFS</option><option value="-60">−60 dBFS</option></select></label>
+      <label>颜色电平上限（dBFS） <input id="water-ceiling" type="number" min="-159" max="0" step="1" value="0"></label>
       <label class="check"><input id="show-water" type="checkbox" checked>显示瀑布图</label>
     </fieldset>
   </div>

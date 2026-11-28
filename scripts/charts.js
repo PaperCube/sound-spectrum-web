@@ -24,8 +24,14 @@ SoundSpectrum.createCharts = function (app, view, audio) {
     heat: [[40, 30, 40], [104, 43, 75], [177, 66, 78], [232, 125, 75], [255, 223, 155]],
     gray: [[37, 39, 38], [73, 74, 73], [123, 124, 122], [181, 182, 179], [240, 241, 238]]
   };
+  const sharedPaletteStops = {
+    inferno: [[0, 0, 4], [27, 12, 65], [74, 12, 107], [120, 28, 109], [165, 44, 96],
+      [207, 68, 70], [237, 105, 37], [251, 154, 6], [247, 209, 61], [252, 255, 164]],
+    cividis: [[0, 34, 78], [7, 51, 111], [49, 68, 107], [76, 85, 108], [100, 103, 112],
+      [125, 122, 120], [151, 143, 120], [179, 163, 115], [206, 186, 105], [255, 233, 69]]
+  };
   const palettes = new Map();
-  for (const stops of [...Object.values(paletteStops), ...Object.values(darkPaletteStops)]) {
+  for (const stops of [...Object.values(paletteStops), ...Object.values(darkPaletteStops), ...Object.values(sharedPaletteStops)]) {
     palettes.set(stops, Array.from({length: 256}, (_, index) => {
       const step = index / 255 * (stops.length - 1);
       const left = Math.min(stops.length - 2, Math.floor(step));
@@ -33,8 +39,12 @@ SoundSpectrum.createCharts = function (app, view, audio) {
     }));
   }
 
-  const waterStops = () => (document.documentElement.dataset.theme === "dark" ? darkPaletteStops : paletteStops)[options["water-palette"]];
-  const waterFloor = (settings = options) => settings["water-floor"] || settings.floor;
+  const waterStops = (settings = options) => {
+    const name = settings["water-palette"];
+    const themed = document.documentElement.dataset.theme === "dark" ? darkPaletteStops : paletteStops;
+    return sharedPaletteStops[name] ?? themed[name];
+  };
+  const waterFloor = () => options["water-floor"] || options.floor;
   const waterResolutions = {
     "very-low": [0.25, 240, 110],
     low: [0.5, 480, 220],
@@ -48,6 +58,61 @@ SoundSpectrum.createCharts = function (app, view, audio) {
   let chartColors;
   let smoothedCurrent = new Float32Array(0);
   let smoothedHeld = new Float32Array(0);
+  let automaticWaterScale = null;
+  let displayedWaterScale;
+  let displayedWaterStops;
+
+  function estimateWaterScale() {
+    const first = indexAt(frequencyAt(state.range[0]));
+    const last = indexAt(frequencyAt(state.range[1]));
+    const histogram = new Uint32Array(256);
+    let count = 0;
+    let sampleBefore = state.latest;
+    for (let row = state.history.length - 1; row >= 0; row--) {
+      const {time, levels} = state.history[row];
+      if (time < state.latest - 4000) break;
+      if (time > sampleBefore) continue;
+      sampleBefore = time - 250;
+      for (let bin = first; bin <= last; bin++) {
+        histogram[levels[bin]]++;
+        count++;
+      }
+    }
+    let lower, upper, cumulative = 0;
+    // History stores attenuation, so the largest bin index represents the weakest level.
+    for (let index = 255; index >= 0; index--) {
+      cumulative += histogram[index];
+      if (lower === undefined && cumulative >= count * 0.2) lower = -index / waterLevelsPerDecibel;
+      if (cumulative >= count * 0.98) {
+        upper = -index / waterLevelsPerDecibel;
+        break;
+      }
+    }
+    const floor = Math.max(-160, Math.floor(lower - 4));
+    return [floor, Math.min(0, Math.max(floor + 24, Math.ceil(upper + 6)))];
+  }
+
+  function waterScale() {
+    const floor = waterFloor();
+    const manual = [floor, Math.max(floor + 1, options["water-ceiling"])];
+    if (options["water-contrast"] !== "auto") {
+      automaticWaterScale = null;
+      return manual;
+    }
+    if (options["water-locked-range"]) return options["water-locked-range"];
+    if (automaticWaterScale && (automaticWaterScale.frequencies !== state.frequencies || !state.history.length)) {
+      automaticWaterScale = null;
+    }
+    if (!state.history.length) return manual;
+    if (automaticWaterScale && (state.waterHistoryOffset || state.latest - automaticWaterScale.time < 500)) {
+      return automaticWaterScale.range.map(Math.round);
+    }
+    const estimate = estimateWaterScale();
+    const range = automaticWaterScale
+      ? estimate.map((value, index) => mix(automaticWaterScale.range[index], value, 0.35)) : estimate;
+    automaticWaterScale = {frequencies: state.frequencies, time: state.latest, range};
+    return range.map(Math.round);
+  }
 
   function syncWaterHistory(visibleSeconds) {
     const position = $("water-history-position");
@@ -83,9 +148,9 @@ SoundSpectrum.createCharts = function (app, view, audio) {
     return w > 0 && h > 0 ? {width, height, left, top, w, h, compact} : null;
   }
 
-  function chartFrame(data = state, settings = options) {
+  function chartFrame(data = state, settings = options, scale) {
     return {
-      data, settings, colors: chartColors, palette: palettes.get(waterStops()),
+      data, settings, colors: chartColors, palette: palettes.get(waterStops(settings)), scale,
       positionOf: frequency => positionOf(frequency, settings.log, data.sampleRate),
       frequencyAt: position => frequencyAt(position, settings.log, data.sampleRate),
       indexAt: frequency => indexAt(frequency, data.frequencies)
@@ -359,9 +424,11 @@ SoundSpectrum.createCharts = function (app, view, audio) {
     const {data, settings, frequencyAt, indexAt} = frame;
     const bins = new Uint32Array(width + 1);
     for (let x = 0; x <= width; x++) bins[x] = indexAt(frequencyAt(mix(...data.range, x / width)));
+    const [floor, ceiling] = frame.scale.map(db => -db * waterLevelsPerDecibel);
+    const colors = Array.from({length: 256}, (_, level) =>
+      frame.palette[Math.round(clamp((floor - level) / (floor - ceiling), 0, 1) * 255)]);
     return {
-      bins, history: data.history, palette: frame.palette, cutoff: timeline.cutoff,
-      floor: -waterFloor(settings) * waterLevelsPerDecibel,
+      bins, history: data.history, colors, cutoff: timeline.cutoff,
       newest: data.latest - timeline.offset * 1000,
       millisecondsPerRow: timeline.duration * 1000 / height,
       maxGap: Math.max(330, settings.interval * 2)
@@ -369,7 +436,7 @@ SoundSpectrum.createCharts = function (app, view, audio) {
   }
 
   function paintWaterPixels(pixels, raster, startX = 0, startY = 0) {
-    const {bins, history, palette, floor, cutoff, newest, millisecondsPerRow, maxGap} = raster;
+    const {bins, history, colors, cutoff, newest, millisecondsPerRow, maxGap} = raster;
     const {width, height, data} = pixels;
     const firstTime = newest - startY * millisecondsPerRow;
     let low = 0, high = history.length - 1;
@@ -395,9 +462,9 @@ SoundSpectrum.createCharts = function (app, view, audio) {
       }
       previousRow = row;
       for (let x = 0; x < width; x++) {
-        let level = floor;
+        let level = 255;
         for (let bin = bins[startX + x]; bin <= bins[startX + x + 1]; bin++) level = Math.min(level, frame.levels[bin]);
-        const rgb = palette[Math.round(clamp(1 - level / floor, 0, 1) * 255)];
+        const rgb = colors[level];
         const offset = y * rowBytes + x * 4;
         data[offset] = rgb[0];
         data[offset + 1] = rgb[1];
@@ -415,7 +482,8 @@ SoundSpectrum.createCharts = function (app, view, audio) {
     while (state.history.length && state.history[0].time < cutoff) state.history.shift();
     if (!plot) return;
     syncWaterHistory(duration);
-    const frame = chartFrame();
+    const scale = updateWaterRamp();
+    const frame = chartFrame(state, options, scale);
     const timeline = {duration, cutoff, offset: state.waterHistoryOffset};
     c.clearRect(0, 0, plot.width, plot.height);
     c.fillStyle = chartColors["chart-bg"];
@@ -495,7 +563,7 @@ SoundSpectrum.createCharts = function (app, view, audio) {
       session: true, sampleRate: state.sampleRate, range: state.range.slice(), frequencies: state.frequencies,
       latest: state.latest, history: isSpectrum ? [] : state.history.slice(), cursor: state.cursor,
       current: isSpectrum ? state.current.slice() : null, held: isSpectrum ? state.held.slice() : null
-    }, {...options});
+    }, {...options}, isSpectrum ? undefined : waterScale());
     const peaks = isSpectrum ? visiblePeaks() : [];
     const curves = isSpectrum ? spectrumCurves(frame) : null;
     return {...geometry, painter(width, part) {
@@ -581,7 +649,26 @@ SoundSpectrum.createCharts = function (app, view, audio) {
 
   function updateWaterRamp() {
     const stops = waterStops();
-    document.querySelector(".ramp").style.backgroundImage = `linear-gradient(90deg, ${stops.map(rgb => `rgb(${rgb.join(",")})`).join(",")})`;
+    const scale = waterScale();
+    if (stops !== displayedWaterStops) {
+      document.querySelector(".ramp").style.backgroundImage = `linear-gradient(90deg, ${stops.map(rgb => `rgb(${rgb.join(",")})`).join(",")})`;
+      displayedWaterStops = stops;
+    }
+    if (scale[0] !== displayedWaterScale?.[0] || scale[1] !== displayedWaterScale?.[1]) {
+      const format = level => String(level).replace("-", "−");
+      $("scale-low").textContent = format(scale[0]);
+      $("scale-high").textContent = `${format(scale[1])} dBFS`;
+      displayedWaterScale = scale;
+    }
+    const lock = $("water-lock-scale");
+    const locked = Boolean(options["water-locked-range"]);
+    lock.hidden = options["water-contrast"] !== "auto";
+    lock.disabled = !locked && !state.history.length;
+    if (lock.getAttribute("aria-pressed") !== String(locked)) {
+      lock.setAttribute("aria-pressed", locked);
+      lock.textContent = locked ? "解锁色标" : "锁定色标";
+    }
+    return scale;
   }
 
   function applyThemeColors(styles) {
@@ -613,6 +700,6 @@ SoundSpectrum.createCharts = function (app, view, audio) {
     }
   }
 
-  return { render, dimensions, waterFloor, updateWaterRamp, applyThemeColors, spectrum, spectrumContext, waterfall, waterContext,
+  return { render, dimensions, waterFloor, waterScale, updateWaterRamp, applyThemeColors, spectrum, spectrumContext, waterfall, waterContext,
     exportGeometry, captureImage };
 };
