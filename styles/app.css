@@ -73,6 +73,7 @@ main > .metadata { grid-area: metadata; }
 .chart-actions .button[aria-pressed="true"] { border-color: var(--control-border); background: var(--surface-selected); }
 .canvas-wrap { position: relative; }
 canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+main[data-input="active"] canvas { -webkit-touch-callout: none; }
 main[data-input="idle"] canvas { touch-action: auto; }
 #spectrum-wrap { height: var(--spectrum-height, clamp(225px, 32vh, 360px)); }
 #water-wrap { height: var(--water-height, 196px); }
