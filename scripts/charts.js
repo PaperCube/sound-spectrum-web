@@ -61,10 +61,10 @@ SoundSpectrum.createCharts = function (app, view, audio) {
   function dimensions(canvas, context) {
     const {width, height} = canvas.getBoundingClientRect();
     const compact = document.documentElement.classList.contains("compact-charts");
-    const left = compact ? (canvas === waterfall ? 44 : 31) : width < 500 ? 43 : 59;
-    const top = compact ? 8 : 15;
+    const left = compact ? 27 : width < 500 ? 43 : 59;
+    const top = compact ? 6 : 15;
     const plotWidth = width - left - (compact ? 4 : 18);
-    const plotHeight = height - top - (compact ? 17 : 28);
+    const plotHeight = height - top - (compact ? 13 : 28);
     if (plotWidth <= 0 || plotHeight <= 0) return null;
     const ratio = Math.min(2, devicePixelRatio || 1);
     const w = Math.round(width * ratio), h = Math.round(height * ratio);
@@ -104,14 +104,15 @@ SoundSpectrum.createCharts = function (app, view, audio) {
 
   function drawGrid(context, plot, isWater) {
     const showLines = !isWater || options["water-grid"];
-    context.font = `${plot.compact ? 10 : 11}px "IBM Plex Mono", Menlo, monospace`;
+    const axisFont = `${plot.compact ? 10 : 11}px "IBM Plex Mono", Menlo, monospace`;
+    context.font = plot.compact ? '10px "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif' : axisFont;
     context.textBaseline = "middle";
     context.lineWidth = 1;
     context.textAlign = "right";
     context.strokeStyle = isWater && state.history.length ? chartColors["water-grid"] : chartColors.grid;
     context.fillStyle = chartColors["axis-ink"];
     const pixelsPerSecond = options["water-time-scale"];
-    const secondsPerTick = [0.25, 0.5, 1, 2, 5].find(seconds => seconds * pixelsPerSecond >= 20);
+    const secondsPerTick = [1, 2, 5].find(seconds => seconds * pixelsPerSecond >= 20);
     const tickSpacing = isWater ? secondsPerTick * pixelsPerSecond : plot.h / 5;
     const firstTick = isWater ? Math.ceil(state.waterHistoryOffset / secondsPerTick) : 0;
     const tickCount = isWater ? Math.floor((plot.h / pixelsPerSecond + state.waterHistoryOffset) / secondsPerTick) : 5;
@@ -124,7 +125,9 @@ SoundSpectrum.createCharts = function (app, view, audio) {
         context.stroke();
       }
       const value = isWater ? secondsPerTick * step : Math.round(-options.floor * step / 5);
-      context.fillText(isWater ? (value ? `−${value}s` : "现在") : (value ? `−${value}` : "0"), plot.left - (plot.compact ? 4 : 8), y);
+      const label = isWater ? (value ? `−${value}s` : "现在") : (value ? `−${value}` : "0");
+      const labelRight = plot.left - (plot.compact ? 3 : 8);
+      context.fillText(label, labelRight, y, labelRight);
     }
     if (!state.session) {
       if (!showLines) return;
@@ -137,6 +140,7 @@ SoundSpectrum.createCharts = function (app, view, audio) {
       context.stroke();
       return;
     }
+    context.font = axisFont;
     context.textAlign = "center";
     let lastLabel = -Infinity;
     for (const f of frequencyTicks(plot)) {
@@ -149,7 +153,7 @@ SoundSpectrum.createCharts = function (app, view, audio) {
       }
       const labelX = clamp(x, plot.left + 4, plot.width - 16);
       if (labelX - lastLabel < 34) continue;
-      context.fillText(f >= 1000 ? `${+(f / 1000).toFixed(2)}k` : `${+f.toFixed(1)}`, labelX, plot.top + plot.h + (plot.compact ? 9 : 15));
+      context.fillText(f >= 1000 ? `${+(f / 1000).toFixed(2)}k` : `${+f.toFixed(1)}`, labelX, plot.top + plot.h + (plot.compact ? 7 : 15));
       lastLabel = labelX;
     }
   }

@@ -83,18 +83,26 @@ main[data-input="idle"] canvas { touch-action: auto; }
 .water-grid-toggle input { margin: 0; accent-color: var(--accent); }
 :is(.water-controls, .chart-actions) select { min-height: 28px; max-width: 100%; padding: 0 3px; border: 1px solid var(--control-border); border-radius: 5px; background: var(--paper); color: var(--ink); font-size: 11px; }
 .panel-head .chart-menu-toggle { display: none; }
-.panel-head.chart-head-compact { position: absolute; inset: 4px calc(6px + var(--safe-area-right)) auto auto; z-index: 2; min-height: 0; padding: 0; }
+.panel-head.chart-head-compact { position: absolute; inset: var(--chart-action-top) var(--chart-action-right) auto auto; z-index: 2; min-height: 0; padding: 0; }
 .chart-head-compact .plot-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .panel-head.chart-head-compact .chart-menu-toggle {
   display: inline-flex;
-  width: 36px;
-  min-height: 36px;
+  width: var(--chart-action-size);
+  height: var(--chart-action-size);
+  min-height: 0;
   padding: 0;
   border-color: transparent;
   border-radius: 0 7px 0 6px;
   background: transparent;
   color: var(--muted);
-  font: 20px/1 var(--mono);
+}
+.chart-menu-toggle::before {
+  content: "";
+  width: 2.5px;
+  height: 2.5px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 -4px currentColor, 0 4px currentColor;
 }
 .chart-head-compact .chart-menu-toggle:is(:hover, :focus-visible) { background: var(--surface-hover); color: var(--ink); }
 .chart-head-compact [popover] {
@@ -253,7 +261,12 @@ dialog::backdrop { background: var(--backdrop); }
 .viewport-charts .chart-card > .peak-list { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
 .viewport-charts .settings .metadata { grid-column: 1 / -1; margin: 0; }
 
-.compact-charts { --chart-splitter-height: 14px; }
+.compact-charts {
+  --chart-splitter-height: 10px;
+  --chart-action-size: 36px;
+  --chart-action-top: 4px;
+  --chart-action-right: calc(6px + var(--safe-area-right));
+}
 .compact-charts main { width: 100%; padding: 0 0 var(--safe-area-bottom); }
 .compact-charts .chart-card { border: 0; border-radius: 0; }
 .compact-charts .instrument { gap: 0; }
@@ -265,17 +278,21 @@ dialog::backdrop { background: var(--backdrop); }
 .compact-charts .top-actions { width: auto; flex-wrap: wrap; gap: 3px; margin-left: 0; }
 .compact-charts .top :is(.icon-button, .settings-launcher) { width: 28px; min-height: 28px; }
 .compact-charts #mic-button { min-height: 28px; padding: 0 6px; font-size: 12px; }
-.compact-charts .chart-cursor span { margin-top: 2px; padding-block: 1px; font-size: 10px; }
-.compact-charts #chart-splitter::before { content: ""; position: absolute; inset: -5px 0; z-index: 2; }
+.compact-charts .chart-cursor span { margin-top: 0; padding-block: 0; font-size: 10px; line-height: 11px; }
+.compact-charts #chart-splitter::before { content: ""; position: absolute; inset: -7px 0; z-index: 2; }
 
+.charts-fullscreen { --fullscreen-action-top: calc(var(--chart-action-top) + var(--safe-area-top)); }
 .charts-fullscreen .top { min-height: 0; height: 0; padding: 0; border: 0; }
 .charts-fullscreen .top-actions > :not(#fullscreen-button) { display: none; }
-.charts-fullscreen #spectrum-section .chart-head-compact { top: calc(4px + var(--safe-area-top)); }
+.charts-fullscreen #spectrum-section .chart-head-compact { top: var(--fullscreen-action-top); }
 .charts-fullscreen #fullscreen-button {
   position: fixed;
   z-index: 3;
-  top: calc(4px + var(--safe-area-top));
-  right: calc(46px + var(--safe-area-right));
+  top: var(--fullscreen-action-top);
+  right: calc(var(--chart-action-right) + var(--chart-action-size) + 4px);
+  width: var(--chart-action-size);
+  height: var(--chart-action-size);
+  min-height: 0;
   background: var(--paper);
 }
 .charts-fullscreen #fullscreen-button:focus-visible { outline-offset: -2px; }
