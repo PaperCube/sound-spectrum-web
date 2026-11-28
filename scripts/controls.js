@@ -407,13 +407,14 @@ SoundSpectrum.bindControls = function (app, view, audio, charts) {
   });
 
   document.addEventListener("keydown", event => {
-    if (event.key === "Escape" && !event.defaultPrevented && fullscreenFallback && !settingsDialog.open
+    const modalOpen = document.querySelector("dialog[open]");
+    if (event.key === "Escape" && !event.defaultPrevented && fullscreenFallback && !modalOpen
       && (!supportsPopovers || !instrument.querySelector(":popover-open"))) {
       fullscreenFallback = false;
       updateLayout();
       return;
     }
-    if (!state.session || settingsDialog.open || event.code !== "Space" || event.repeat || event.target.closest("button, input, select")) return;
+    if (!state.session || modalOpen || event.code !== "Space" || event.repeat || event.target.closest("button, input, select")) return;
     event.preventDefault();
     togglePause();
   });

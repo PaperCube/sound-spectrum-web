@@ -34,7 +34,7 @@ SoundSpectrum.createCharts = function (app, view, audio) {
   }
 
   const waterStops = () => (document.documentElement.dataset.theme === "dark" ? darkPaletteStops : paletteStops)[options["water-palette"]];
-  const waterFloor = () => options["water-floor"] || options.floor;
+  const waterFloor = (settings = options) => settings["water-floor"] || settings.floor;
   const waterResolutions = {
     "very-low": [0.25, 240, 110],
     low: [0.5, 480, 220],
@@ -62,12 +62,8 @@ SoundSpectrum.createCharts = function (app, view, audio) {
 
   function dimensions(canvas, context) {
     const {width, height} = canvas.getBoundingClientRect();
-    const compact = document.documentElement.classList.contains("compact-charts");
-    const left = yAxisWidth;
-    const top = compact ? 6 : 15;
-    const plotWidth = width - left - (compact ? 4 : 18);
-    const plotHeight = height - top - (compact ? 13 : 28);
-    if (plotWidth <= 0 || plotHeight <= 0) return null;
+    const plot = plotDimensions(width, height);
+    if (!plot) return null;
     const ratio = Math.min(2, devicePixelRatio || 1);
     const w = Math.round(width * ratio), h = Math.round(height * ratio);
     if (!w || !h) return null;
@@ -76,13 +72,34 @@ SoundSpectrum.createCharts = function (app, view, audio) {
       canvas.height = h;
     }
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
-    return {width, height, left, top, w: plotWidth, h: plotHeight, compact};
+    return plot;
   }
 
-  const plotX = (frequency, plot) => plot.left + (positionOf(frequency) - state.range[0]) / (state.range[1] - state.range[0]) * plot.w;
-  const plotY = (level, plot) => plot.top + clamp(level / options.floor, 0, 1) * plot.h;
+  function plotDimensions(width, height, compact = document.documentElement.classList.contains("compact-charts")) {
+    const left = yAxisWidth;
+    const top = compact ? 6 : 15;
+    const w = width - left - (compact ? 4 : 18);
+    const h = height - top - (compact ? 13 : 28);
+    return w > 0 && h > 0 ? {width, height, left, top, w, h, compact} : null;
+  }
 
-  function frequencyTicks(plot) {
+  function chartFrame(data = state, settings = options) {
+    return {
+      data, settings, colors: chartColors, palette: palettes.get(waterStops()),
+      positionOf: frequency => positionOf(frequency, settings.log, data.sampleRate),
+      frequencyAt: position => frequencyAt(position, settings.log, data.sampleRate),
+      indexAt: frequency => indexAt(frequency, data.frequencies)
+    };
+  }
+
+  const plotX = (frequency, plot, frame) => {
+    const [start, end] = frame.data.range;
+    return plot.left + (frame.positionOf(frequency) - start) / (end - start) * plot.w;
+  };
+  const plotY = (level, plot, frame) => plot.top + clamp(level / frame.settings.floor, 0, 1) * plot.h;
+
+  function frequencyTicks(plot, frame) {
+    const {data: state, settings: options, frequencyAt} = frame;
     const min = frequencyAt(state.range[0]), max = frequencyAt(state.range[1]);
     if (options.log && max / min > 4) {
       const ticks = [];
@@ -104,7 +121,9 @@ SoundSpectrum.createCharts = function (app, view, audio) {
     return ticks;
   }
 
-  function drawGrid(context, plot, isWater) {
+  function drawGrid(context, plot, frame, timeline, tile) {
+    const {data: state, settings: options, colors: chartColors} = frame;
+    const isWater = Boolean(timeline);
     const showLines = !isWater || options["water-grid"];
     context.font = yAxisFont;
     context.textBaseline = "middle";
@@ -112,14 +131,18 @@ SoundSpectrum.createCharts = function (app, view, audio) {
     context.textAlign = "right";
     context.strokeStyle = isWater && state.history.length ? chartColors["water-grid"] : chartColors.grid;
     context.fillStyle = chartColors["axis-ink"];
-    const pixelsPerSecond = options["water-time-scale"];
-    const secondsPerTick = [1, 2, 5].find(seconds => seconds * pixelsPerSecond >= 20);
+    const pixelsPerSecond = timeline ? plot.h / timeline.duration : 0;
+    const secondsPerTick = isWater ? [1, 2, 5].find(seconds => seconds * pixelsPerSecond >= 20)
+      ?? Math.ceil(4 / pixelsPerSecond) * 5 : 0;
     const tickSpacing = isWater ? secondsPerTick * pixelsPerSecond : plot.h / 5;
-    const firstTick = isWater ? Math.ceil(state.waterHistoryOffset / secondsPerTick) : 0;
-    const tickCount = isWater ? Math.floor((plot.h / pixelsPerSecond + state.waterHistoryOffset) / secondsPerTick) : 5;
+    const offset = timeline?.offset ?? 0;
+    const firstVisible = tile ? Math.max(0, tile.top - plot.top - 8) / pixelsPerSecond : 0;
+    const lastVisible = tile ? Math.min(plot.h, tile.bottom - plot.top + 8) / pixelsPerSecond : timeline?.duration;
+    const firstTick = isWater ? Math.ceil((offset + firstVisible) / secondsPerTick) : 0;
+    const tickCount = isWater ? Math.floor((offset + lastVisible) / secondsPerTick) : 5;
     const labelRight = plot.left - 3;
     for (let step = firstTick; step <= tickCount; step++) {
-      const y = Math.round(plot.top + step * tickSpacing - (isWater ? state.waterHistoryOffset * pixelsPerSecond : 0)) + .5;
+      const y = Math.round(plot.top + step * tickSpacing - offset * pixelsPerSecond) + .5;
       if (showLines) {
         context.beginPath();
         context.moveTo(plot.left, y);
@@ -144,8 +167,8 @@ SoundSpectrum.createCharts = function (app, view, audio) {
     context.font = `${plot.compact ? 10 : 11}px "IBM Plex Mono", Menlo, monospace`;
     context.textAlign = "center";
     let lastLabel = -Infinity;
-    for (const f of frequencyTicks(plot)) {
-      const x = Math.round(plotX(f, plot)) + .5;
+    for (const f of frequencyTicks(plot, frame)) {
+      const x = Math.round(plotX(f, plot, frame)) + .5;
       if (showLines) {
         context.beginPath();
         context.moveTo(x, plot.top);
@@ -159,15 +182,16 @@ SoundSpectrum.createCharts = function (app, view, audio) {
     }
   }
 
-  function trace(context, plot, values) {
+  function trace(context, plot, values, frame) {
+    const {data: state, settings: options} = frame;
     context.beginPath();
     let started = false;
     let previous = plot.left;
     for (let i = 0; i < state.frequencies.length; i++) {
-      const x = plotX(state.frequencies[i], plot);
+      const x = plotX(state.frequencies[i], plot, frame);
       if (x < plot.left - 25 || (options.log && state.frequencies[i] < 20)) continue;
       if (x > plot.left + plot.w + 25 && started) break;
-      const y = plotY(values[i], plot);
+      const y = plotY(values[i], plot, frame);
       if (started) context.lineTo(x, y);
       else context.moveTo(x, y);
       started = true;
@@ -176,8 +200,7 @@ SoundSpectrum.createCharts = function (app, view, audio) {
     return previous;
   }
 
-  function smoothSpectrum(values, result, halfOctaveRatio) {
-    const { frequencies } = state;
+  function smoothSpectrum(values, result, halfOctaveRatio, frequencies) {
     if (result.length !== values.length) result = new Float32Array(values.length);
     let left = 0;
     let right = 0;
@@ -192,7 +215,8 @@ SoundSpectrum.createCharts = function (app, view, audio) {
     return result;
   }
 
-  function drawPeakMarkers(context, plot, peaks, smoothedValues) {
+  function drawPeakMarkers(context, plot, peaks, smoothedValues, frame) {
+    const {colors: chartColors, indexAt} = frame;
     const occupied = [];
     context.save();
     context.font = '11px "IBM Plex Mono", Menlo, monospace';
@@ -200,10 +224,10 @@ SoundSpectrum.createCharts = function (app, view, audio) {
     context.textBaseline = "top";
     context.lineWidth = 1;
     for (const [index, peak] of peaks.entries()) {
-      const x = plotX(peak.frequency, plot);
-      const y = plotY(peak.level, plot);
+      const x = plotX(peak.frequency, plot, frame);
+      const y = plotY(peak.level, plot, frame);
       if (smoothedValues) {
-        const curveY = plotY(smoothedValues[indexAt(peak.frequency)], plot);
+        const curveY = plotY(smoothedValues[indexAt(peak.frequency)], plot, frame);
         if (Math.abs(curveY - y) > 2) {
           context.strokeStyle = chartColors["marker-line"];
           context.beginPath();
@@ -272,30 +296,32 @@ SoundSpectrum.createCharts = function (app, view, audio) {
     }
   }
 
-  function drawSpectrum(peaks) {
-    const c = spectrumContext;
-    const plot = dimensions(spectrum, c);
-    if (!plot) return;
-    c.clearRect(0, 0, plot.width, plot.height);
+  function spectrumCurves(frame) {
+    const {data, settings} = frame;
+    if (!settings["spectrum-smoothing"]) return {current: data.current, held: data.held};
+    const halfOctaveRatio = 2 ** (1 / (2 * settings["spectrum-smoothing"]));
+    const current = smoothSpectrum(data.current, data === state ? smoothedCurrent : new Float32Array(0), halfOctaveRatio, data.frequencies);
+    const held = settings.hold ? smoothSpectrum(data.held, data === state ? smoothedHeld : new Float32Array(0), halfOctaveRatio, data.frequencies) : data.held;
+    if (data === state) {
+      smoothedCurrent = current;
+      if (settings.hold) smoothedHeld = held;
+    }
+    return {current, held};
+  }
+
+  function drawSpectrum(c, plot, peaks, frame, curves, selected) {
+    const {data: state, settings: options, colors: chartColors, indexAt} = frame;
     c.fillStyle = chartColors["chart-bg"];
     c.fillRect(plot.left, plot.top, plot.w, plot.h);
-    drawGrid(c, plot, false);
+    drawGrid(c, plot, frame);
     if (!state.session) return;
-    let current = state.current;
-    let held = state.held;
-    const smoothing = options["spectrum-smoothing"];
-    if (smoothing) {
-      // The smoothing bandwidth is 1/smoothing octaves, centered on the displayed frequency.
-      const halfOctaveRatio = 2 ** (1 / (2 * smoothing));
-      current = smoothedCurrent = smoothSpectrum(current, smoothedCurrent, halfOctaveRatio);
-      if (options.hold) held = smoothedHeld = smoothSpectrum(held, smoothedHeld, halfOctaveRatio);
-    }
+    const {current, held} = curves;
     c.save();
     c.beginPath();
     c.rect(plot.left, plot.top, plot.w, plot.h);
     c.clip();
     if (options["spectrum-fill"]) {
-      const end = trace(c, plot, current);
+      const end = trace(c, plot, current, frame);
       const gradient = c.createLinearGradient(0, plot.top, 0, plot.top + plot.h);
       gradient.addColorStop(0, chartColors["fill-start"]);
       gradient.addColorStop(1, chartColors["fill-end"]);
@@ -306,18 +332,18 @@ SoundSpectrum.createCharts = function (app, view, audio) {
       c.fill();
     }
     if (options.hold) {
-      trace(c, plot, held);
+      trace(c, plot, held, frame);
       c.strokeStyle = chartColors["held-trace"];
       c.lineWidth = 1;
       c.stroke();
     }
-    trace(c, plot, current);
+    trace(c, plot, current, frame);
     c.strokeStyle = chartColors.trace;
     c.lineWidth = 1.6;
     c.stroke();
-    const selected = state.hover ?? state.cursor;
-    if (selected != null && plotPosition(selected) >= 0 && plotPosition(selected) <= 1) {
-      const y = plotY(state.current[indexAt(selected)], plot);
+    const cursorX = selected == null ? NaN : plotX(selected, plot, frame);
+    if (cursorX >= plot.left && cursorX <= plot.left + plot.w) {
+      const y = plotY(state.current[indexAt(selected)], plot, frame);
       c.strokeStyle = chartColors.cursor;
       c.setLineDash([4, 4]);
       c.beginPath();
@@ -326,70 +352,206 @@ SoundSpectrum.createCharts = function (app, view, audio) {
       c.stroke();
     }
     c.restore();
-    drawPeakMarkers(c, plot, peaks, smoothing ? current : null);
+    drawPeakMarkers(c, plot, peaks, options["spectrum-smoothing"] ? current : null, frame);
   }
 
-  function drawWaterfall() {
-    const c = waterContext;
-    const plot = options["show-water"] ? dimensions(waterfall, c) : null;
-    const visibleSeconds = plot ? plot.h / options["water-time-scale"] : 0;
-    const cutoff = state.latest - Math.max(options.history, visibleSeconds) * 1000;
-    while (state.history.length && state.history[0].time < cutoff) state.history.shift();
-    if (!plot) return;
-    syncWaterHistory(visibleSeconds);
-    c.clearRect(0, 0, plot.width, plot.height);
-    c.fillStyle = chartColors["chart-bg"];
-    c.fillRect(plot.left, plot.top, plot.w, plot.h);
-    if (!state.history.length) {
-      drawGrid(c, plot, true);
-      return;
-    }
-    const [resolutionScale, maxWidth, maxHeight] = waterResolutions[options["water-quality"]];
-    const width = Math.max(1, Math.min(maxWidth, Math.round(plot.w * resolutionScale)));
-    const height = Math.max(1, Math.min(maxHeight, Math.round(plot.h * resolutionScale)));
-    if (waterImage.width !== width || waterImage.height !== height) {
-      waterImage.width = width;
-      waterImage.height = height;
-    }
-    const pixels = imageContext.createImageData(width, height);
-    const palette = palettes.get(waterStops());
-    const floor = -waterFloor() * waterLevelsPerDecibel;
+  function waterfallRaster(frame, timeline, width, height) {
+    const {data, settings, frequencyAt, indexAt} = frame;
     const bins = new Uint32Array(width + 1);
-    for (let x = 0; x <= width; x++) bins[x] = indexAt(frequencyAt(mix(...state.range, x / width)));
-    let row = state.history.length - 1;
-    let previousRow = -1;
+    for (let x = 0; x <= width; x++) bins[x] = indexAt(frequencyAt(mix(...data.range, x / width)));
+    return {
+      bins, history: data.history, palette: frame.palette, cutoff: timeline.cutoff,
+      floor: -waterFloor(settings) * waterLevelsPerDecibel,
+      newest: data.latest - timeline.offset * 1000,
+      millisecondsPerRow: timeline.duration * 1000 / height,
+      maxGap: Math.max(330, settings.interval * 2)
+    };
+  }
+
+  function paintWaterPixels(pixels, raster, startX = 0, startY = 0) {
+    const {bins, history, palette, floor, cutoff, newest, millisecondsPerRow, maxGap} = raster;
+    const {width, height, data} = pixels;
+    const firstTime = newest - startY * millisecondsPerRow;
+    let low = 0, high = history.length - 1;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (history[middle].time < firstTime) low = middle + 1;
+      else high = middle;
+    }
+    let row = low, previousRow = -1;
     const rowBytes = width * 4;
-    const millisecondsPerRow = plot.h / height * 1000 / options["water-time-scale"];
     for (let y = 0; y < height; y++) {
-      const time = state.latest - state.waterHistoryOffset * 1000 - y * millisecondsPerRow;
+      const time = newest - (startY + y) * millisecondsPerRow;
       if (time < cutoff) break;
-      while (row > 0 && state.history[row - 1].time >= time) row--;
-      const frame = state.history[row];
-      const levels = frame && frame.time >= time && frame.time - time < Math.max(330, options.interval * 2)
-        ? frame.levels : null;
-      if (!levels) {
+      while (row > 0 && history[row - 1].time >= time) row--;
+      const frame = history[row];
+      if (!frame || frame.time < time || frame.time - time >= maxGap) {
         previousRow = -1;
         continue;
       }
       if (row === previousRow) {
-        pixels.data.copyWithin(y * rowBytes, (y - 1) * rowBytes, y * rowBytes);
+        data.copyWithin(y * rowBytes, (y - 1) * rowBytes, y * rowBytes);
         continue;
       }
       previousRow = row;
       for (let x = 0; x < width; x++) {
         let level = floor;
-        for (let bin = bins[x]; bin <= bins[x + 1]; bin++) level = Math.min(level, levels[bin]);
+        for (let bin = bins[startX + x]; bin <= bins[startX + x + 1]; bin++) level = Math.min(level, frame.levels[bin]);
         const rgb = palette[Math.round(clamp(1 - level / floor, 0, 1) * 255)];
-        const offset = (y * width + x) * 4;
-        pixels.data[offset] = rgb[0];
-        pixels.data[offset + 1] = rgb[1];
-        pixels.data[offset + 2] = rgb[2];
-        pixels.data[offset + 3] = 255;
+        const offset = y * rowBytes + x * 4;
+        data[offset] = rgb[0];
+        data[offset + 1] = rgb[1];
+        data[offset + 2] = rgb[2];
+        data[offset + 3] = 255;
       }
     }
-    imageContext.putImageData(pixels, 0, 0);
-    c.drawImage(waterImage, plot.left, plot.top, plot.w, plot.h);
-    drawGrid(c, plot, true);
+  }
+
+  function drawWaterfall() {
+    const c = waterContext;
+    const plot = options["show-water"] ? dimensions(waterfall, c) : null;
+    const duration = plot ? plot.h / options["water-time-scale"] : 0;
+    const cutoff = state.latest - Math.max(options.history, duration) * 1000;
+    while (state.history.length && state.history[0].time < cutoff) state.history.shift();
+    if (!plot) return;
+    syncWaterHistory(duration);
+    const frame = chartFrame();
+    const timeline = {duration, cutoff, offset: state.waterHistoryOffset};
+    c.clearRect(0, 0, plot.width, plot.height);
+    c.fillStyle = chartColors["chart-bg"];
+    c.fillRect(plot.left, plot.top, plot.w, plot.h);
+    if (state.history.length) {
+      const [resolutionScale, maxWidth, maxHeight] = waterResolutions[options["water-quality"]];
+      const width = Math.max(1, Math.min(maxWidth, Math.round(plot.w * resolutionScale)));
+      const height = Math.max(1, Math.min(maxHeight, Math.round(plot.h * resolutionScale)));
+      if (waterImage.width !== width || waterImage.height !== height) {
+        waterImage.width = width;
+        waterImage.height = height;
+      }
+      const pixels = imageContext.createImageData(width, height);
+      paintWaterPixels(pixels, waterfallRaster(frame, timeline, width, height));
+      imageContext.putImageData(pixels, 0, 0);
+      c.drawImage(waterImage, plot.left, plot.top, plot.w, plot.h);
+    }
+    drawGrid(c, plot, frame, timeline);
+  }
+
+  function exportGeometry(kind) {
+    if (!state.session || !state.current.length) return null;
+    const canvas = kind === "spectrum" ? spectrum : waterfall;
+    const {width, height} = canvas.getBoundingClientRect();
+    let plot = plotDimensions(width, height);
+    if (kind === "spectrum") return plot ? {plot} : null;
+    if (!state.history.length) return null;
+    if (kind === "history" && !plot) plot = plotDimensions(spectrum.getBoundingClientRect().width, 196);
+    if (!plot) return null;
+    const pixelsPerSecond = options["water-time-scale"];
+    const visibleDuration = plot.h / pixelsPerSecond;
+    if (kind === "visible") {
+      const cutoff = state.latest - Math.max(options.history, visibleDuration) * 1000;
+      return {plot, offset: state.waterHistoryOffset, duration: visibleDuration, cutoff};
+    }
+    const duration = (state.latest - state.history[0].time + options.interval) / 1000;
+    const cutoff = state.latest - duration * 1000;
+    return {plot: {...plot, h: duration * pixelsPerSecond, height: duration * pixelsPerSecond + plot.height - plot.h},
+      offset: 0, duration, cutoff};
+  }
+
+  function drawExportCursor(context, plot, frame) {
+    const {cursor, current} = frame.data;
+    if (cursor == null) return;
+    const x = plotX(cursor, plot, frame);
+    if (x < plot.left || x > plot.left + plot.w) return;
+    const {colors, indexAt} = frame;
+    context.save();
+    context.strokeStyle = colors.cursor;
+    context.setLineDash([4, 4]);
+    context.beginPath();
+    context.moveTo(x, plot.top);
+    context.lineTo(x, plot.top + plot.h);
+    context.stroke();
+    context.setLineDash([]);
+    const label = `${hz(cursor)} · ${dB(current[indexAt(cursor)])} dBFS`;
+    context.font = '10px "IBM Plex Mono", Menlo, monospace';
+    context.textBaseline = "middle";
+    context.textAlign = "center";
+    const width = Math.min(context.measureText(label).width + 8, plot.width - 4);
+    const labelX = clamp(x, width / 2 + 2, plot.width - width / 2 - 2);
+    const labelY = Math.max(plot.top, plot.top + plot.h - 16);
+    context.fillStyle = colors["marker-bg"];
+    context.fillRect(labelX - width / 2, labelY, width, 13);
+    context.strokeStyle = colors["marker-line"];
+    context.strokeRect(labelX - width / 2, labelY, width, 13);
+    context.fillStyle = colors["marker-ink"];
+    context.fillText(label, labelX, labelY + 7, width - 4);
+    context.restore();
+  }
+
+  function captureImage(kind) {
+    const geometry = exportGeometry(kind);
+    if (!geometry) return null;
+    const isSpectrum = kind === "spectrum";
+    const frame = chartFrame({
+      session: true, sampleRate: state.sampleRate, range: state.range.slice(), frequencies: state.frequencies,
+      latest: state.latest, history: isSpectrum ? [] : state.history.slice(), cursor: state.cursor,
+      current: isSpectrum ? state.current.slice() : null, held: isSpectrum ? state.held.slice() : null
+    }, {...options});
+    const peaks = isSpectrum ? visiblePeaks() : [];
+    const curves = isSpectrum ? spectrumCurves(frame) : null;
+    return {...geometry, painter(width, part) {
+      const {plot: source} = geometry;
+      const scale = width / source.width;
+      const plot = plotDimensions(source.width, part.height / scale, source.compact);
+      let paint;
+      if (isSpectrum) {
+        paint = context => {
+          drawSpectrum(context, plot, peaks, frame, curves, frame.data.cursor);
+          drawExportCursor(context, plot, frame);
+        };
+      } else {
+        const timeline = {duration: part.duration, offset: part.offset, cutoff: geometry.cutoff};
+        const left = Math.round(plot.left * scale), top = Math.round(plot.top * scale);
+        const columns = Math.max(1, Math.round((plot.left + plot.w) * scale) - left);
+        const rows = Math.max(1, Math.round((plot.top + plot.h) * scale) - top);
+        const raster = waterfallRaster(frame, timeline, columns, rows);
+        const buffer = document.createElement("canvas");
+        const bufferContext = buffer.getContext("2d");
+        paint = (context, tile) => {
+          context.fillStyle = frame.colors["chart-bg"];
+          context.fillRect(plot.left, plot.top, plot.w, plot.h);
+          const x = Math.max(tile.x, left), y = Math.max(tile.y, top);
+          const w = Math.min(tile.x + tile.width, left + columns) - x;
+          const h = Math.min(tile.y + tile.height, top + rows) - y;
+          if (w > 0 && h > 0) {
+            if (buffer.width !== w || buffer.height !== h) {
+              buffer.width = w;
+              buffer.height = h;
+            }
+            const pixels = bufferContext.createImageData(w, h);
+            paintWaterPixels(pixels, raster, x - left, y - top);
+            bufferContext.putImageData(pixels, 0, 0);
+            context.setTransform(1, 0, 0, 1, 0, 0);
+            context.drawImage(buffer, x - tile.x, y - tile.y);
+            context.setTransform(scale, 0, 0, scale, -tile.x, -tile.y);
+          }
+          drawGrid(context, plot, frame, timeline, {top: tile.y / scale, bottom: (tile.y + tile.height) / scale});
+        };
+        return {
+          draw: tilePainter(paint),
+          dispose() { buffer.width = buffer.height = 0; }
+        };
+      }
+      return {draw: tilePainter(paint)};
+      function tilePainter(renderTile) {
+        return (context, tile) => {
+          context.setTransform(1, 0, 0, 1, 0, 0);
+          context.fillStyle = frame.colors.paper;
+          context.fillRect(0, 0, tile.width, tile.height);
+          context.setTransform(scale, 0, 0, scale, -tile.x, -tile.y);
+          renderTile(context, tile);
+        };
+      }
+    }};
   }
 
   function updateChartCursor(cursorNode, canvas, context, frequency) {
@@ -435,7 +597,12 @@ SoundSpectrum.createCharts = function (app, view, audio) {
   function render() {
     if (state.dirty) {
       const peaks = visiblePeaks();
-      drawSpectrum(peaks);
+      const plot = dimensions(spectrum, spectrumContext);
+      if (plot) {
+        const frame = chartFrame();
+        spectrumContext.clearRect(0, 0, plot.width, plot.height);
+        drawSpectrum(spectrumContext, plot, peaks, frame, spectrumCurves(frame), state.hover ?? state.cursor);
+      }
       updatePeakList(peaks);
       updateReadouts();
       state.dirty = false;
@@ -446,5 +613,6 @@ SoundSpectrum.createCharts = function (app, view, audio) {
     }
   }
 
-  return { render, dimensions, waterFloor, updateWaterRamp, applyThemeColors, spectrum, spectrumContext, waterfall, waterContext };
+  return { render, dimensions, waterFloor, updateWaterRamp, applyThemeColors, spectrum, spectrumContext, waterfall, waterContext,
+    exportGeometry, captureImage };
 };

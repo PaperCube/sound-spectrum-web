@@ -5,14 +5,12 @@ SoundSpectrum.createView = function (app) {
 
   const frequencyRanges = { bass: [20, 250], voice: [100, 4000], treble: [2000, 20000] };
 
-  function positionOf(f) {
-    return options.log
-      ? Math.log(Math.max(20, f) / 20) / Math.log(state.sampleRate / 40)
-      : f / (state.sampleRate / 2);
+  function positionOf(f, log = options.log, sampleRate = state.sampleRate) {
+    return log ? Math.log(Math.max(20, f) / 20) / Math.log(sampleRate / 40) : f / (sampleRate / 2);
   }
 
-  function frequencyAt(position) {
-    return options.log ? 20 * (state.sampleRate / 40) ** position : position * state.sampleRate / 2;
+  function frequencyAt(position, log = options.log, sampleRate = state.sampleRate) {
+    return log ? 20 * (sampleRate / 40) ** position : position * sampleRate / 2;
   }
 
   function changeWindow(left, length) {

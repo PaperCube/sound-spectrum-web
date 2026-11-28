@@ -12,6 +12,8 @@
 <script defer src="./scripts/multires.js"></script>
 <script defer src="./scripts/audio.js"></script>
 <script defer src="./scripts/charts.js"></script>
+<script defer src="./scripts/image-files.js"></script>
+<script defer src="./scripts/image-export.js"></script>
 <script defer src="./scripts/settings-help.js"></script>
 <script defer src="./scripts/chart-gestures.js"></script>
 <script defer src="./scripts/controls.js"></script>
@@ -88,6 +90,7 @@
           <button id="hold-button" class="button" aria-pressed="true">峰值保持</button>
           <button id="pause-button" class="button" aria-pressed="false" disabled>冻结</button>
           <button id="fit-button" class="button" disabled>复位</button>
+          <button id="export-image-button" class="button" type="button" aria-haspopup="dialog" aria-controls="image-export-dialog" disabled>保存图像</button>
         </div>
       </div>
       <div id="spectrum-wrap" class="canvas-wrap">
@@ -203,6 +206,49 @@
     <button class="button" id="clear-peak-button">重置峰值保持</button>
   </div>
   <div class="settings-tooltip" id="settings-tooltip" role="tooltip" hidden></div>
+</dialog>
+<dialog id="image-export-dialog" aria-labelledby="image-export-title">
+  <div class="dialog-head">
+    <h2 id="image-export-title">保存图像</h2>
+    <form method="dialog"><button class="button">关闭</button></form>
+  </div>
+  <form class="image-export-form" id="image-export-form">
+    <div class="settings image-export-options">
+      <label>导出内容
+        <select id="image-export-content" autofocus>
+          <option value="spectrum">当前频谱</option>
+          <option value="visible">当前可见的瀑布图</option>
+          <option value="history">全部已保留的瀑布图</option>
+        </select>
+      </label>
+      <label>输出宽度
+        <select id="image-export-width">
+          <option value="double">2× 图表宽度</option>
+          <option value="2048">2048 px</option>
+          <option value="4096">4096 px</option>
+          <option value="8192">8192 px</option>
+          <option value="custom">自定义宽度</option>
+        </select>
+      </label>
+      <label id="image-export-custom-row" hidden>宽度（px）
+        <input id="image-export-custom" type="number" min="256" max="8192" step="1" value="4096">
+      </label>
+      <label id="image-export-layout-row" hidden>历史图片
+        <select id="image-export-layout">
+          <option value="single">单张长图</option>
+          <option value="split">分段高清</option>
+        </select>
+      </label>
+      <output id="image-export-size"></output>
+      <p id="image-export-status" role="status" hidden></p>
+    </div>
+    <div class="settings-footer">
+      <button class="button primary" id="image-export-generate" type="submit">生成图像</button>
+      <button class="button" id="image-export-cancel" type="button" hidden>取消生成</button>
+      <a class="button" id="image-export-download" download hidden>下载 PNG</a>
+      <a class="button" id="image-export-preview" target="_blank" rel="noopener" hidden>预览 PNG</a>
+    </div>
+  </form>
 </dialog>
 </body>
 </html>

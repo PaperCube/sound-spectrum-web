@@ -201,6 +201,11 @@ dialog::backdrop { background: var(--backdrop); }
 .settings-footer { flex-wrap: wrap; border-top: 1px solid var(--line); }
 #settings-notice { margin: 10px 17px 0; }
 .settings-footer .button { font-size: 12px; }
+#image-export-dialog { width: min(440px, calc(100% - var(--safe-area-left) - var(--safe-area-right) - 26px)); }
+.image-export-form { display: flex; flex-direction: column; min-height: 0; }
+.image-export-options { grid-template-columns: minmax(0, 1fr); gap: 5px; }
+.image-export-options output, #image-export-status { margin: 5px 0; color: var(--muted); font-size: 12px; }
+.image-export-form a.button { text-decoration: none; }
 [hidden] { display: none !important; }
 @media (max-width: 700px) {
   .top { --top-side-padding: 12px; flex-wrap: wrap; }

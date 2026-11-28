@@ -99,14 +99,14 @@ SoundSpectrum.createAudio = function (app, view) {
     invalidate();
   }
 
-  function indexAt(frequency) {
-    let low = 0, high = state.frequencies.length - 1;
+  function indexAt(frequency, frequencies = state.frequencies) {
+    let low = 0, high = frequencies.length - 1;
     while (low < high) {
       const middle = (low + high) >>> 1;
-      if (state.frequencies[middle] < frequency) low = middle + 1;
+      if (frequencies[middle] < frequency) low = middle + 1;
       else high = middle;
     }
-    return low && frequency - state.frequencies[low - 1] < state.frequencies[low] - frequency ? low - 1 : low;
+    return low && frequency - frequencies[low - 1] < frequencies[low] - frequency ? low - 1 : low;
   }
 
   function interpolatePeak(index) {
@@ -302,6 +302,7 @@ SoundSpectrum.createAudio = function (app, view) {
     spectrum.tabIndex = waterfall.tabIndex = active ? 0 : -1;
     $("pause-button").disabled = !active;
     $("fit-button").disabled = !active;
+    $("export-image-button").disabled = !active;
     $("clear-button").disabled = !active;
     $("clear-peak-button").disabled = !active;
     $("pause-button").textContent = state.paused ? "继续" : "冻结";

@@ -10,6 +10,7 @@
   app.bindSettingsHelp(app);
   app.bindControls(app, view, audio, charts);
   app.bindChartGestures(app, view, charts);
+  app.bindImageExport(app, charts);
 
   window.addEventListener("pagehide", () => {
     if (state.session) audio.stopMicrophone();
