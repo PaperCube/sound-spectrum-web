@@ -1,4 +1,10 @@
 * { box-sizing: border-box; }
+:root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+}
 body { margin: 0; }
 button, select, input { font: inherit; }
 button { cursor: pointer; }
@@ -7,7 +13,17 @@ button:focus-visible, select:focus-visible, input:focus-visible, canvas:focus-vi
   outline-offset: 3px;
 }
 button:disabled { opacity: .5; cursor: default; }
-.top { min-height: 52px; padding: 6px 23px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); }
+.top {
+  --top-side-padding: 23px;
+  min-height: 52px;
+  padding: calc(6px + var(--safe-area-top)) max(var(--top-side-padding), calc(6px + var(--safe-area-right)))
+    6px max(var(--top-side-padding), calc(6px + var(--safe-area-left)));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+}
 .crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; white-space: nowrap; }
 .crumb span { color: var(--muted); }
 .crumb h1 { font-size: 14px; font-weight: 650; margin: 0; }
@@ -21,7 +37,7 @@ button:disabled { opacity: .5; cursor: default; }
 .theme-menu button { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; border: 0; border-radius: 4px; padding: 6px 8px; background: transparent; color: var(--ink); font-size: 13px; text-align: left; white-space: nowrap; }
 .theme-menu button:hover, .theme-menu button[aria-pressed="true"] { background: var(--surface-hover); }
 .theme-menu button[aria-pressed="true"]::after { content: "✓"; color: var(--accent); }
-.settings-launcher { position: fixed; left: max(16px, env(safe-area-inset-left)); bottom: max(13px, env(safe-area-inset-bottom)); z-index: 2; box-shadow: 0 2px 9px var(--shadow); }
+.settings-launcher { position: fixed; left: max(16px, calc(6px + var(--safe-area-left))); bottom: max(13px, calc(6px + var(--safe-area-bottom))); z-index: 2; box-shadow: 0 2px 9px var(--shadow); }
 .button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; padding: 0 10px; background: var(--paper); border: 1px solid var(--control-border); border-radius: 6px; color: var(--ink); font-size: 13px; font-weight: 550; white-space: nowrap; }
 .button:not(:disabled):hover { background: var(--surface-hover); }
 .top .icon-button { border-color: transparent; }
@@ -67,7 +83,7 @@ main[data-input="idle"] canvas { touch-action: auto; }
 .water-grid-toggle input { margin: 0; accent-color: var(--accent); }
 :is(.water-controls, .chart-actions) select { min-height: 28px; max-width: 100%; padding: 0 3px; border: 1px solid var(--control-border); border-radius: 5px; background: var(--paper); color: var(--ink); font-size: 11px; }
 .panel-head .chart-menu-toggle { display: none; }
-.panel-head.chart-head-compact { position: absolute; inset: 0 0 auto auto; z-index: 2; min-height: 0; padding: 0; }
+.panel-head.chart-head-compact { position: absolute; inset: 4px calc(6px + var(--safe-area-right)) auto auto; z-index: 2; min-height: 0; padding: 0; }
 .chart-head-compact .plot-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .panel-head.chart-head-compact .chart-menu-toggle {
   display: inline-flex;
@@ -82,10 +98,11 @@ main[data-input="idle"] canvas { touch-action: auto; }
 }
 .chart-head-compact .chart-menu-toggle:is(:hover, :focus-visible) { background: var(--surface-hover); color: var(--ink); }
 .chart-head-compact [popover] {
+  --chart-menu-edge: max(calc(8px + var(--safe-area-top)), var(--chart-menu-anchor, 0px));
   position: fixed;
-  inset: var(--chart-menu-top, auto) var(--chart-menu-right, 8px) var(--chart-menu-bottom, auto) auto;
-  width: min(195px, calc(100vw - 16px));
-  max-height: var(--chart-menu-max-height, none);
+  inset: var(--chart-menu-edge) calc(8px + var(--safe-area-right)) auto auto;
+  width: min(195px, calc(100vw - var(--safe-area-left) - var(--safe-area-right) - 16px));
+  max-height: max(0px, calc(100dvh - var(--chart-menu-edge) - var(--safe-area-bottom) - 8px));
   margin: 0;
   padding: 8px;
   overflow: auto;
@@ -95,6 +112,12 @@ main[data-input="idle"] canvas { touch-action: auto; }
   background: var(--paper);
   color: var(--ink);
   box-shadow: 0 4px 16px var(--shadow);
+}
+.chart-head-compact [popover][data-opens-above] {
+  --chart-menu-edge: max(calc(8px + var(--safe-area-bottom)), var(--chart-menu-anchor, 0px));
+  top: auto;
+  bottom: var(--chart-menu-edge);
+  max-height: max(0px, calc(100dvh - var(--chart-menu-edge) - var(--safe-area-top) - 8px));
 }
 .chart-head-compact [popover]:not(:popover-open) { display: none; }
 .chart-head-compact [popover]:popover-open { display: grid; justify-content: stretch; gap: 6px; }
@@ -131,7 +154,17 @@ main[data-layout="side"] #water-resize { display: none; }
 .peak-list { display: flex; flex-wrap: wrap; gap: 5px; margin: 0; padding: 0 13px 9px; list-style: none; }
 .peak-list li { border: 1px solid var(--marker-border); border-radius: 4px; background: var(--marker-bg); color: var(--marker-ink); padding: 4px 6px; font: 11px var(--mono); white-space: nowrap; }
 .peak-list .primary-peak { font-weight: 750; border-color: var(--trace); }
-dialog { width: min(770px, calc(100% - 26px)); max-height: calc(100% - 30px); border: 1px solid var(--line); border-radius: 10px; padding: 0; color: var(--ink); background: var(--paper); box-shadow: 0 14px 46px var(--shadow); }
+dialog {
+  inset: var(--safe-area-top) var(--safe-area-right) var(--safe-area-bottom) var(--safe-area-left);
+  width: min(770px, calc(100% - var(--safe-area-left) - var(--safe-area-right) - 26px));
+  max-height: calc(100% - var(--safe-area-top) - var(--safe-area-bottom) - 30px);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0;
+  color: var(--ink);
+  background: var(--paper);
+  box-shadow: 0 14px 46px var(--shadow);
+}
 dialog[open] { display: flex; flex-direction: column; }
 .dialog-head, .settings-footer { flex-shrink: 0; }
 dialog::backdrop { background: var(--backdrop); }
@@ -161,7 +194,7 @@ dialog::backdrop { background: var(--backdrop); }
 .settings-footer .button { font-size: 12px; }
 [hidden] { display: none !important; }
 @media (max-width: 700px) {
-  .top { padding-inline: 12px; flex-wrap: wrap; }
+  .top { --top-side-padding: 12px; flex-wrap: wrap; }
   .top-actions { gap: 5px; margin-left: auto; }
   main { width: calc(100% - 24px); padding-top: 13px; }
   .panel-head { padding: 8px; gap: 4px; }
@@ -189,14 +222,14 @@ dialog::backdrop { background: var(--backdrop); }
 
 .viewport-charts, .viewport-charts body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .viewport-charts body { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100dvh; }
-.viewport-charts .top { padding-inline: 12px; flex-wrap: wrap; }
+.viewport-charts .top { --top-side-padding: 12px; flex-wrap: wrap; }
 .viewport-charts .top .layout-controls { display: none; }
 .viewport-charts .settings-launcher { position: static; width: 32px; min-height: 32px; padding: 0; box-shadow: none; }
 .viewport-charts .settings-launcher span { display: none; }
 .viewport-charts main {
   width: calc(100% - 24px);
   min-height: 0;
-  padding: 6px 0 max(6px, env(safe-area-inset-bottom));
+  padding: 6px 0 max(6px, var(--safe-area-bottom));
   grid-template: "notice" auto "charts" minmax(0, 1fr) / minmax(0, 1fr);
   align-items: stretch;
   overflow: clip;
@@ -221,10 +254,13 @@ dialog::backdrop { background: var(--backdrop); }
 .viewport-charts .settings .metadata { grid-column: 1 / -1; margin: 0; }
 
 .compact-charts { --chart-splitter-height: 14px; }
-.compact-charts main { width: 100%; padding: 0 0 env(safe-area-inset-bottom); }
+.compact-charts main { width: 100%; padding: 0 0 var(--safe-area-bottom); }
 .compact-charts .chart-card { border: 0; border-radius: 0; }
 .compact-charts .instrument { gap: 0; }
-.compact-charts .top { min-height: 36px; padding: 2px 6px; }
+.compact-charts .top {
+  min-height: 36px;
+  padding: calc(2px + var(--safe-area-top)) calc(6px + var(--safe-area-right)) 2px calc(6px + var(--safe-area-left));
+}
 .compact-charts .crumb { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .compact-charts .top-actions { width: auto; flex-wrap: wrap; gap: 3px; margin-left: 0; }
 .compact-charts .top :is(.icon-button, .settings-launcher) { width: 28px; min-height: 28px; }
@@ -234,11 +270,12 @@ dialog::backdrop { background: var(--backdrop); }
 
 .charts-fullscreen .top { min-height: 0; height: 0; padding: 0; border: 0; }
 .charts-fullscreen .top-actions > :not(#fullscreen-button) { display: none; }
+.charts-fullscreen #spectrum-section .chart-head-compact { top: calc(4px + var(--safe-area-top)); }
 .charts-fullscreen #fullscreen-button {
   position: fixed;
   z-index: 3;
-  top: env(safe-area-inset-top);
-  right: max(36px, env(safe-area-inset-right));
+  top: calc(4px + var(--safe-area-top));
+  right: calc(46px + var(--safe-area-right));
   background: var(--paper);
 }
 .charts-fullscreen #fullscreen-button:focus-visible { outline-offset: -2px; }

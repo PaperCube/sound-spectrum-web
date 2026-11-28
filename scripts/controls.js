@@ -34,14 +34,16 @@ SoundSpectrum.bindControls = function (app, view, audio, charts) {
       const readouts = Array.from(card.querySelectorAll(":scope > .plot-footer, :scope > .peak-list, :scope > .water-history"));
       const resizeHandle = card.querySelector(".chart-resize");
       const positionMenu = () => {
-        const {top, right, bottom} = trigger.getBoundingClientRect();
-        const below = window.innerHeight - bottom - 12;
-        const above = top - 12;
+        const {top, bottom} = trigger.getBoundingClientRect();
+        const viewportStyles = getComputedStyle(root);
+        const safeTop = parseFloat(viewportStyles.getPropertyValue("--safe-area-top")) || 0;
+        const safeBottom = parseFloat(viewportStyles.getPropertyValue("--safe-area-bottom")) || 0;
+        const below = window.innerHeight - safeBottom - bottom - 12;
+        const above = top - safeTop - 12;
         const openAbove = below < 200 && above > below;
-        menu.style.setProperty("--chart-menu-right", Math.max(8, window.innerWidth - right) + "px");
-        menu.style.setProperty("--chart-menu-top", openAbove ? "auto" : (bottom + 4) + "px");
-        menu.style.setProperty("--chart-menu-bottom", openAbove ? (window.innerHeight - top + 4) + "px" : "auto");
-        menu.style.setProperty("--chart-menu-max-height", Math.max(0, openAbove ? above : below) + "px");
+        menu.toggleAttribute("data-opens-above", openAbove);
+        const anchor = openAbove ? window.innerHeight - top + 4 : bottom + 4;
+        menu.style.setProperty("--chart-menu-anchor", anchor + "px");
       };
       syncChartMenus.push(compact => {
         if (compact === head.classList.contains("chart-head-compact")) return;
